@@ -1,17 +1,127 @@
 import asyncio
 from sqlalchemy import select
+from datetime import date
 from app.core.database import AsyncSessionLocal
 from app.models.hierarchy import Hospital, Sector, Asset, AssetType
 from app.models.checklist import ChecklistTemplate, ChecklistItem, ItemType
+from app.models.compliance import NormativeReference, NormativeVersion
+
+
+async def seed_normative_catalog(db):
+    """Siembra el catálogo de normas legales y técnicas (ISO 7396-1, Res 1130/2000, IRAM 2529)"""
+    existing_norm = await db.execute(select(NormativeReference))
+    if existing_norm.scalars().first():
+        return
+
+    print("INFO: Sembrando catálogo de normativas y versiones vigentes...")
+
+    # 1. ISO 7396-1:2016
+    iso_norm = NormativeReference(
+        code="ISO 7396-1:2016",
+        title="Sistemas de distribución de gases medicinales — Parte 1: Redes de tuberías para gases medicinales comprimidos y de vacío",
+        issuing_body="International Organization for Standardization (ISO)",
+        publication_date=date(2016, 3, 1),
+        current_version="2016",
+        is_current=True,
+        description="Estándar internacional para redes de gases medicinales, manifolds centrales, válvulas AVSU y tomas terminales.",
+        url_reference="https://www.iso.org/standard/60907.html"
+    )
+    db.add(iso_norm)
+    await db.flush()
+
+    iso_v1 = NormativeVersion(
+        reference_id=iso_norm.id,
+        version_code="2016",
+        effective_date=date(2016, 3, 1),
+        changelog="Publicación de la versión consolidada 2016 para distribución hospitalaria de gases.",
+        is_active=True
+    )
+    db.add(iso_v1)
+
+    # 2. Resolución MSAL 1130/2000
+    res_msal = NormativeReference(
+        code="Res1130/2000",
+        title="Buenas Prácticas de Fabricación y Control de Gases Medicinales",
+        issuing_body="Ministerio de Salud de la Nación Argentina (MSAL)",
+        publication_date=date(2000, 11, 28),
+        current_version="2000",
+        is_current=True,
+        description="Regulación federal obligatoria para envases de gases medicinales, identificación con cruz griega verde, rotulación y pruebas periódicas.",
+        url_reference="http://servicios.infoleg.gob.ar/infolegInternet/anexos/65000-69999/65385/norma.htm"
+    )
+    db.add(res_msal)
+    await db.flush()
+
+    res_v1 = NormativeVersion(
+        reference_id=res_msal.id,
+        version_code="2000",
+        effective_date=date(2000, 11, 28),
+        changelog="Aprobación e implementación de directrices de buenas prácticas en la República Argentina.",
+        is_active=True
+    )
+    db.add(res_v1)
+
+    # 3. Norma IRAM 2529 (Cilindros de acero sin costura - Ensayo periódico)
+    iram_norm = NormativeReference(
+        code="IRAM 2529",
+        title="Cilindros de acero sin costura para gases comprimidos y licuados. Inspección periódica y ensayo a presión hidrostática",
+        issuing_body="Instituto Argentino de Normalización y Certificación (IRAM)",
+        publication_date=date(2013, 5, 15),
+        current_version="2013",
+        is_current=True,
+        description="Regulación técnica de validez de prueba hidráulica (máx 5 años) para cilindros de alta presión.",
+        url_reference="https://comprasonline.iram.org.ar"
+    )
+    db.add(iram_norm)
+    await db.flush()
+
+    iram_v1 = NormativeVersion(
+        reference_id=iram_norm.id,
+        version_code="2013",
+        effective_date=date(2013, 5, 15),
+        changelog="Actualización de métodos de inspección visual y prueba de expansión volumétrica.",
+        is_active=True
+    )
+    db.add(iram_v1)
+
+    # 4. Norma histórica superada para demostrar chequeo de vigencia (ISO 7396:2007)
+    iso_old = NormativeReference(
+        code="ISO 7396-1:2007",
+        title="Medical gas pipeline systems — Part 1: Pipeline systems for compressed medical gases and vacuum (Superada)",
+        issuing_body="International Organization for Standardization (ISO)",
+        publication_date=date(2007, 7, 1),
+        current_version="2007",
+        is_current=False,
+        superseded_by_id=iso_norm.id,
+        description="Edición anterior sustituida por la revisión ISO 7396-1:2016.",
+        url_reference="https://www.iso.org/standard/38072.html"
+    )
+    db.add(iso_old)
+    await db.flush()
+
+    iso_old_v1 = NormativeVersion(
+        reference_id=iso_old.id,
+        version_code="2007",
+        effective_date=date(2007, 7, 1),
+        expiry_date=date(2016, 2, 29),
+        changelog="Reemplazada formalmente por la edición 2016.",
+        is_active=False
+    )
+    db.add(iso_old_v1)
 
 
 async def seed_database():
     async with AsyncSessionLocal() as db:
+        # Sembrar catálogo normativo siempre si no existe
+        await seed_normative_catalog(db)
+
         # Verificar si ya existen hospitales
         check_hospital = await db.execute(select(Hospital))
         if check_hospital.scalars().first():
-            print("INFO: La base de datos ya contiene registros. Saltando seed.")
+            await db.commit()
+            print("INFO: La base de datos ya contiene registros clínicos. Catálogo normativo verificado.")
             return
+
 
         print("INFO: Sembrando jerarquía hospitalaria y normativas (Res. 1130/2000 e ISO 7396-1)...")
 

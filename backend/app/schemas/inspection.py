@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict
 from app.models.inspection import InspectionStatus
 from app.schemas.hierarchy import AssetRead
 from app.schemas.checklist import ChecklistTemplateRead, ChecklistItemRead
+from app.schemas.compliance import ComplianceSummary
 
 
 class InspectionResponseBase(BaseModel):
@@ -58,8 +59,10 @@ class InspectionDetailRead(InspectionRead):
     total_items: int = 0
     completed_items: int = 0
     progress_percentage: float = 0.0
+    compliance_summary: Optional[ComplianceSummary] = None
 
     model_config = ConfigDict(from_attributes=True)
+
 
 
 class InspectionCompleteRequest(BaseModel):
@@ -93,3 +96,6 @@ class StatsOverviewResponse(BaseModel):
     in_progress_inspections: int
     draft_inspections: int
     recent_inspections: List[InspectionHistoryItem] = []
+    global_compliance_percentage: Optional[float] = 100.0
+    active_outdated_norms_count: Optional[int] = 0
+

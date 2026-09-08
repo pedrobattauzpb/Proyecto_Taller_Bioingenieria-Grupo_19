@@ -99,6 +99,108 @@ export interface InspectionDetail {
   total_items: number;
   completed_items: number;
   progress_percentage: number;
+  compliance_summary?: ComplianceSummary | null;
+}
+
+export type ComplianceStatus = 'COMPLIANT' | 'NON_COMPLIANT' | 'WARNING' | 'NOT_EVALUATED';
+export type ComplianceSeverity = 'CRITICAL' | 'MAJOR' | 'MINOR' | 'OBSERVATION';
+export type AuditEventType =
+  | 'VALIDATION_RUN'
+  | 'COMPLIANCE_CHECK'
+  | 'NORM_UPDATE'
+  | 'TEMPLATE_VERSION_CHANGE'
+  | 'INSPECTION_COMPLETED';
+
+export interface NormativeVersion {
+  id: number;
+  reference_id: number;
+  version_code: string;
+  effective_date?: string | null;
+  expiry_date?: string | null;
+  changelog?: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+
+export interface NormativeReference {
+  id: number;
+  code: string;
+  title: string;
+  issuing_body: string;
+  publication_date?: string | null;
+  current_version: string;
+  is_current: boolean;
+  superseded_by_id?: number | null;
+  url_reference?: string | null;
+  description?: string | null;
+  created_at: string;
+  versions?: NormativeVersion[];
+}
+
+export interface NormativeClauseCheck {
+  item_id: number;
+  item_code: string;
+  item_title: string;
+  referencia_normativa: string;
+  matched_norm_code?: string | null;
+  is_current: boolean;
+  status_message: string;
+  suggested_replacement?: string | null;
+}
+
+export interface NormativeCurrencyReport {
+  template_id: number;
+  template_title: string;
+  asset_type: string;
+  all_current: boolean;
+  total_items: number;
+  current_items_count: number;
+  outdated_items_count: number;
+  clauses: NormativeClauseCheck[];
+}
+
+export interface ComplianceResult {
+  id: number;
+  inspection_id: number;
+  item_id: number;
+  response_id?: number | null;
+  compliance_status: ComplianceStatus;
+  normative_ref: string;
+  expected_value?: string | null;
+  actual_value?: string | null;
+  deviation_detail?: string | null;
+  severity: ComplianceSeverity;
+  validated_at: string;
+  normative_version_id?: number | null;
+}
+
+export interface ComplianceSummary {
+  inspection_id: number;
+  status: string;
+  total_items: number;
+  evaluated_items: number;
+  compliant_items: number;
+  non_compliant_items: number;
+  warning_items: number;
+  pending_items: number;
+  compliance_percentage: number;
+  is_fully_compliant: boolean;
+  critical_deviations_count: number;
+  major_deviations_count: number;
+  minor_deviations_count: number;
+  observation_deviations_count: number;
+  normative_currency: NormativeCurrencyReport;
+  results: ComplianceResult[];
+}
+
+export interface AuditLogEntry {
+  id: number;
+  inspection_id?: number | null;
+  event_type: AuditEventType;
+  event_detail: Record<string, any>;
+  actor: string;
+  created_at: string;
 }
 
 export interface InspectionHistoryItem {
@@ -125,6 +227,8 @@ export interface StatsOverviewResponse {
   in_progress_inspections: number;
   draft_inspections: number;
   recent_inspections: InspectionHistoryItem[];
+  global_compliance_percentage?: number;
+  active_outdated_norms_count?: number;
 }
 
 export interface CreateInspectionPayload {
@@ -148,3 +252,4 @@ export interface CompleteInspectionPayload {
   notes?: string;
   inspector_name?: string;
 }
+

@@ -13,8 +13,11 @@ from app.schemas.inspection import (
     BatchInspectionResponsesRequest, InspectionCompleteRequest,
     InspectionResponseRead
 )
+from app.models.compliance import AuditLog, AuditEventType
+from app.services.compliance_engine import ComplianceEngine
 
 router = APIRouter()
+
 
 
 @router.post("", response_model=InspectionDetailRead, status_code=status.HTTP_201_CREATED, summary="Iniciar nueva inspección")
@@ -79,7 +82,11 @@ async def get_inspection(id: int, db: AsyncSession = Depends(get_db)):
     return await get_inspection_detail_internal(id, db)
 
 
-async def get_inspection_detail_internal(inspection_id: int, db: AsyncSession) -> InspectionDetailRead:
+async def get_inspection_detail_internal(
+    inspection_id: int,
+    db: AsyncSession,
+    include_compliance: bool = True
+) -> InspectionDetailRead:
     result = await db.execute(
         select(Inspection)
         .options(
@@ -109,6 +116,19 @@ async def get_inspection_detail_internal(inspection_id: int, db: AsyncSession) -
     )
     progress = round((completed_items / total_items * 100.0), 1) if total_items > 0 else 0.0
 
+    compliance_summary = None
+    if include_compliance:
+        try:
+            compliance_summary = await ComplianceEngine.validate_inspection_compliance(
+                inspection_id=inspection_id,
+                db=db,
+                record_audit_log=False,
+                actor="INSPECTION_DETAIL_READ"
+            )
+        except Exception as e:
+            # Fallback seguro en caso de error en evaluación secundaria
+            pass
+
     return InspectionDetailRead(
         id=inspection.id,
         asset_id=inspection.asset_id,
@@ -123,8 +143,10 @@ async def get_inspection_detail_internal(inspection_id: int, db: AsyncSession) -
         responses=inspection.responses,
         total_items=total_items,
         completed_items=completed_items,
-        progress_percentage=progress
+        progress_percentage=progress,
+        compliance_summary=compliance_summary
     )
+
 
 
 @router.put("/{id}/batch-responses", response_model=InspectionDetailRead, summary="Guardado atómico por lotes con debounce")
@@ -249,8 +271,34 @@ async def complete_inspection(
         if complete_in.inspector_name:
             inspection.inspector_name = complete_in.inspector_name
 
+    # Ejecutar validación final de compliance y registrar log inmutable de finalización
+    final_compliance = await ComplianceEngine.validate_inspection_compliance(
+        inspection_id=id,
+        db=db,
+        record_audit_log=False,
+        actor=inspection.inspector_name
+    )
+
+    completion_audit_log = AuditLog(
+        inspection_id=id,
+        event_type=AuditEventType.INSPECTION_COMPLETED,
+        event_detail={
+            "status": "COMPLETED",
+            "inspector_name": inspection.inspector_name,
+            "compliance_percentage": final_compliance.compliance_percentage,
+            "is_fully_compliant": final_compliance.is_fully_compliant,
+            "critical_deviations_count": final_compliance.critical_deviations_count,
+            "major_deviations_count": final_compliance.major_deviations_count,
+            "completed_at": str(inspection.completed_at),
+        },
+        actor=inspection.inspector_name,
+        created_at=datetime.utcnow()
+    )
+    db.add(completion_audit_log)
+
     await db.commit()
-    return await get_inspection_detail_internal(id, db)
+    return await get_inspection_detail_internal(id, db, include_compliance=True)
+
 
 
 @router.get("", response_model=List[InspectionDetailRead], summary="Listar inspecciones")

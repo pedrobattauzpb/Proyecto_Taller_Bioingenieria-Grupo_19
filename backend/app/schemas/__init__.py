@@ -14,6 +14,13 @@ from app.schemas.inspection import (
     InspectionBase, InspectionCreate, InspectionRead, InspectionDetailRead,
     InspectionCompleteRequest, InspectionHistoryItem, StatsOverviewResponse
 )
+from app.schemas.compliance import (
+    NormativeVersionBase, NormativeVersionCreate, NormativeVersionRead,
+    NormativeReferenceBase, NormativeReferenceCreate, NormativeReferenceUpdate, NormativeReferenceRead,
+    NormativeClauseCheck, NormativeCurrencyReport,
+    ComplianceResultBase, ComplianceResultRead, ComplianceSummary,
+    AuditLogBase, AuditLogCreate, AuditLogRead
+)
 
 __all__ = [
     "AssetBase", "AssetCreate", "AssetRead",
@@ -25,5 +32,11 @@ __all__ = [
     "InspectionResponseBase", "InspectionResponseCreate", "InspectionResponseRead",
     "BatchInspectionResponsesRequest",
     "InspectionBase", "InspectionCreate", "InspectionRead", "InspectionDetailRead",
-    "InspectionCompleteRequest", "InspectionHistoryItem", "StatsOverviewResponse"
+    "InspectionCompleteRequest", "InspectionHistoryItem", "StatsOverviewResponse",
+    "NormativeVersionBase", "NormativeVersionCreate", "NormativeVersionRead",
+    "NormativeReferenceBase", "NormativeReferenceCreate", "NormativeReferenceUpdate", "NormativeReferenceRead",
+    "NormativeClauseCheck", "NormativeCurrencyReport",
+    "ComplianceResultBase", "ComplianceResultRead", "ComplianceSummary",
+    "AuditLogBase", "AuditLogCreate", "AuditLogRead"
 ]
+

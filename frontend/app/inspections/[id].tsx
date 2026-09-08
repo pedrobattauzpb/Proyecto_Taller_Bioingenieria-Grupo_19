@@ -34,6 +34,11 @@ import { Input } from '../../components/ui/Input';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { ChecklistCard } from '../../components/checklist/ChecklistCard';
 import { AutoSaveIndicator, SaveStatus } from '../../components/checklist/AutoSaveIndicator';
+import { useComplianceValidation } from '../../hooks/useComplianceValidation';
+import { ComplianceAlertBanner } from '../../components/checklist/ComplianceAlertBanner';
+import { ComplianceSummaryCard } from '../../components/checklist/ComplianceSummaryCard';
+import { NormativeStatusIndicator } from '../../components/checklist/NormativeStatusIndicator';
+
 
 export default function InspectionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -230,7 +235,14 @@ export default function InspectionScreen() {
   ).length;
   const currentProgress = totalItems > 0 ? (answeredCount / totalItems) * 100 : 0;
 
+  // Validación de cumplimiento normativo algorítmica en tiempo real
+  const complianceEvaluation = useComplianceValidation(
+    inspection.template?.items || [],
+    responsesMap
+  );
+
   return (
+
     <View style={styles.screenWrapper}>
       {/* Sticky Header de la Inspección con Progreso y Auto-Save */}
       <View style={styles.stickyHeader}>
@@ -255,7 +267,9 @@ export default function InspectionScreen() {
                 variant={isCompleted ? 'emerald' : 'amber'}
                 size="sm"
               />
+              <NormativeStatusIndicator templateId={inspection.template_id} />
             </View>
+
           </View>
 
           <View style={styles.headerRightActions}>
@@ -332,6 +346,13 @@ export default function InspectionScreen() {
           )}
         </Card>
 
+        {/* Banner de Alerta de Compliance en Tiempo Real */}
+        <ComplianceAlertBanner
+          nonCompliantCount={complianceEvaluation.nonCompliantCount}
+          criticalCount={complianceEvaluation.criticalCount}
+          warningCount={complianceEvaluation.warningCount}
+        />
+
         {/* Lista de Ítems del Checklist */}
         <View style={styles.checklistSection}>
           <Text style={styles.sectionHeading}>PUNTOS DE VERIFICACIÓN TÉCNICA</Text>
@@ -347,6 +368,9 @@ export default function InspectionScreen() {
           ))}
         </View>
 
+        {/* Tarjeta Resumen de Cumplimiento Legal y Auditoría */}
+        <ComplianceSummaryCard summary={complianceEvaluation} />
+
         {/* Botón de Cierre al Pie */}
         {!isCompleted && (
           <View style={styles.bottomCtaContainer}>
@@ -359,6 +383,7 @@ export default function InspectionScreen() {
             />
           </View>
         )}
+
       </ScrollView>
 
       {/* Modal de Finalización y Firma de Auditoría */}

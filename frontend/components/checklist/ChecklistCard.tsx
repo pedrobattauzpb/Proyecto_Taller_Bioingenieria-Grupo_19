@@ -19,6 +19,8 @@ import { SegmentedControl } from '../ui/SegmentedControl';
 import { Input } from '../ui/Input';
 import { NormativeBadge } from './NormativeBadge';
 import { Badge } from '../ui/Badge';
+import { ComplianceBadge } from './ComplianceBadge';
+import { evaluateLocalCompliance } from '../../hooks/useComplianceValidation';
 
 interface ChecklistCardProps {
   item: ChecklistItem;
@@ -27,6 +29,7 @@ interface ChecklistCardProps {
   disabled?: boolean;
   style?: ViewStyle;
 }
+
 
 export const ChecklistCard: React.FC<ChecklistCardProps> = ({
   item,
@@ -91,7 +94,10 @@ export const ChecklistCard: React.FC<ChecklistCardProps> = ({
     return styles.neutralBorder;
   };
 
+  const complianceEval = evaluateLocalCompliance(item, response);
+
   return (
+
     <Card style={[styles.card, getBorderHighlight(), style]}>
       {/* Encabezado del Ítem */}
       <View style={styles.header}>
@@ -101,6 +107,10 @@ export const ChecklistCard: React.FC<ChecklistCardProps> = ({
             {item.is_mandatory && (
               <Badge label="Obligatorio" variant="rose" size="sm" />
             )}
+            <ComplianceBadge
+              status={complianceEval.status}
+              severity={complianceEval.severity}
+            />
           </View>
           <NormativeBadge reference={item.referencia_normativa} />
         </View>
@@ -110,6 +120,7 @@ export const ChecklistCard: React.FC<ChecklistCardProps> = ({
         {item.description && (
           <Text style={styles.description}>{item.description}</Text>
         )}
+
 
         {/* Indicador de Rango Nominal si aplica */}
         {item.input_type === 'NUMERIC' && (item.min_value !== null || item.max_value !== null) && (

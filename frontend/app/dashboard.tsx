@@ -180,7 +180,21 @@ export default function Dashboard() {
           </Text>
           <Text style={styles.kpiSub}>Pendientes de cierre</Text>
         </Card>
+
+        <Card style={styles.kpiCard}>
+          <View style={styles.kpiHeader}>
+            <Text style={styles.kpiLabel}>CUMPLIMIENTO LEGAL</Text>
+            <View style={[styles.kpiIconBox, { backgroundColor: '#f0fdf4' }]}>
+              <ShieldCheck size={18} color="#059669" />
+            </View>
+          </View>
+          <Text style={[styles.kpiValue, { color: '#059669' }]}>
+            {stats?.global_compliance_percentage !== undefined ? `${stats.global_compliance_percentage}%` : '100%'}
+          </Text>
+          <Text style={styles.kpiSub}>Auditoría algorítmica</Text>
+        </Card>
       </View>
+
 
       {/* Disposición Principal en 2 Columnas (Desktop) */}
       <View style={[styles.layoutRow, isDesktop ? styles.desktopRow : styles.mobileCol]}>

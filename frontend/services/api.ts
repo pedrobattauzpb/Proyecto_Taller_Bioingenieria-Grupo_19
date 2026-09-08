@@ -9,7 +9,11 @@ import {
   BatchResponsesPayload,
   CompleteInspectionPayload,
   AssetType,
-  InspectionStatus
+  InspectionStatus,
+  ComplianceSummary,
+  NormativeReference,
+  NormativeCurrencyReport,
+  AuditLogEntry,
 } from './types';
 
 // Determinar URL del backend: En Web usa localhost:8000 por defecto
@@ -22,6 +26,7 @@ export const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
 
 export const apiService = {
   // Jerarquía
@@ -82,4 +87,38 @@ export const apiService = {
     const response = await apiClient.get<InspectionHistoryItem[]>(`/assets/${assetId}/history`);
     return response.data;
   },
+
+  // Auditoría Normativa y Cumplimiento Legal en Tiempo Real (Objetivo Específico 2)
+  async getInspectionCompliance(inspectionId: number, recalculate: boolean = true): Promise<ComplianceSummary> {
+    const response = await apiClient.get<ComplianceSummary>(
+      `/inspections/${inspectionId}/compliance`,
+      { params: { recalculate } }
+    );
+    return response.data;
+  },
+
+  async getNormatives(isCurrent?: boolean): Promise<NormativeReference[]> {
+    const response = await apiClient.get<NormativeReference[]>('/normatives', {
+      params: isCurrent !== undefined ? { is_current: isCurrent } : {},
+    });
+    return response.data;
+  },
+
+  async checkTemplateNormativeCurrency(templateId: number): Promise<NormativeCurrencyReport> {
+    const response = await apiClient.get<NormativeCurrencyReport>(
+      `/normatives/templates/${templateId}/currency-check`
+    );
+    return response.data;
+  },
+
+  async listAuditLogs(params?: {
+    inspection_id?: number;
+    event_type?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AuditLogEntry[]> {
+    const response = await apiClient.get<AuditLogEntry[]>('/audit-logs', { params });
+    return response.data;
+  },
 };
+

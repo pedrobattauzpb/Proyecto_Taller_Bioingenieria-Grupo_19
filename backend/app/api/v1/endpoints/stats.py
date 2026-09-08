@@ -7,7 +7,9 @@ from app.core.database import get_db
 from app.models.hierarchy import Asset
 from app.models.checklist import ChecklistTemplate, ChecklistItem, ItemType
 from app.models.inspection import Inspection, InspectionResponse, InspectionStatus
+from app.models.compliance import NormativeReference
 from app.schemas.inspection import StatsOverviewResponse, InspectionHistoryItem
+
 
 router = APIRouter()
 
@@ -84,6 +86,18 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
             )
         )
 
+    # Conteo de normas desactualizadas
+    outdated_res = await db.execute(select(func.count(NormativeReference.id)).where(NormativeReference.is_current == False))
+    active_outdated_norms_count = outdated_res.scalar() or 0
+
+    # Porcentaje global de cumplimiento normativo (promedio de inspecciones evaluadas)
+    total_eval_items = sum(i.evaluated_items for i in recent_items)
+    total_non_comp = sum(i.non_compliant_count for i in recent_items)
+    if total_eval_items > 0:
+        global_comp_pct = round(((total_eval_items - total_non_comp) / total_eval_items) * 100.0, 1)
+    else:
+        global_comp_pct = 100.0
+
     return StatsOverviewResponse(
         total_assets=total_assets,
         active_assets=active_assets,
@@ -91,7 +105,9 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         completed_inspections=completed_inspections,
         in_progress_inspections=in_progress_inspections,
         draft_inspections=draft_inspections,
-        recent_inspections=recent_items
+        recent_inspections=recent_items,
+        global_compliance_percentage=global_comp_pct,
+        active_outdated_norms_count=active_outdated_norms_count
     )
 
 
