@@ -5,8 +5,11 @@
 !.env.example
 
 # Python / Backend
+backend/python-3.11/
+backend/python-3.11.zip
 __pycache__/
 *.py[cod]
+*.pyc
 *$py.class
 *.so
 .Python
@@ -46,3 +49,16 @@ web-build/
 *~
 .DS_Store
 Thumbs.db
+
+# AI Tools
+.agent/
+.agents/
+.claude/
+.codex/
+.gemini/
+.hermes/
+.kiro/
+.pi/
+.qoder/
+.rovodev/
+.vibe/
