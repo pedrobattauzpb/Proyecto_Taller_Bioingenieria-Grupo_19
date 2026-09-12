@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 
-export type BadgeVariant = 'emerald' | 'rose' | 'amber' | 'blue' | 'indigo' | 'slate' | 'cyan';
+export type BadgeVariant = 'emerald' | 'rose' | 'amber' | 'blue' | 'indigo' | 'slate' | 'cyan' | 'purple';
 
 interface BadgeProps {
   label: string;
@@ -28,15 +28,17 @@ export const Badge: React.FC<BadgeProps> = ({
         return { bg: '#fff1f2', text: '#e11d48', border: '#fecdd3' };
       case 'amber':
         return { bg: '#fffbeb', text: '#d97706', border: '#fde68a' };
+      case 'blue':
+        return { bg: '#eff6ff', text: '#2563eb', border: '#bfdbfe' };
       case 'indigo':
         return { bg: '#eef2ff', text: '#4f46e5', border: '#c7d2fe' };
+      case 'purple':
+        return { bg: '#faf5ff', text: '#9333ea', border: '#e9d5ff' };
       case 'cyan':
         return { bg: '#ecfeff', text: '#0891b2', border: '#a5f3fc' };
       case 'slate':
-        return { bg: '#f1f5f9', text: '#475569', border: '#cbd5e1' };
-      case 'blue':
       default:
-        return { bg: '#eff6ff', text: '#2563eb', border: '#bfdbfe' };
+        return { bg: '#f1f5f9', text: '#475569', border: '#cbd5e1' };
     }
   };
 

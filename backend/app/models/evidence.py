@@ -18,7 +18,7 @@ class InspectionEvidence(Base):
     storage_url = Column(String(500), nullable=False)
     file_size_bytes = Column(Integer, nullable=True)
     uploaded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    uploaded_by = Column(Integer, nullable=True) # Could be a FK to a Users table if one existed
+    uploaded_by = Column(String(255), nullable=True)  # Texto libre provisional (nombre/matrícula); se reemplazará por FK a Users en Objetivo 6 (Autenticación y Roles)
 
     # Relaciones
     inspection = relationship("Inspection", back_populates="evidences")

@@ -12,8 +12,9 @@ import {
   ChevronUp,
   AlertTriangle,
   FileText,
+  Camera,
 } from 'lucide-react-native';
-import { ChecklistItem, InspectionResponse } from '../../services/types';
+import { ChecklistItem, InspectionResponse, InspectionEvidence } from '../../services/types';
 import { Card } from '../ui/Card';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { Input } from '../ui/Input';
@@ -21,11 +22,18 @@ import { NormativeBadge } from './NormativeBadge';
 import { Badge } from '../ui/Badge';
 import { ComplianceBadge } from './ComplianceBadge';
 import { evaluateLocalCompliance } from '../../hooks/useComplianceValidation';
+import { EvidenceThumbnail } from './EvidenceThumbnail';
+import { MediaUploader } from './MediaUploader';
 
 interface ChecklistCardProps {
   item: ChecklistItem;
   response?: InspectionResponse;
+  evidences?: InspectionEvidence[];
+  inspectionId?: number;
+  inspectorName?: string;
   onUpdateResponse: (itemId: number, updates: Partial<InspectionResponse>) => void;
+  onUploadEvidence?: (evidence: InspectionEvidence) => void;
+  onDeleteEvidence?: (evidenceId: number) => Promise<void> | void;
   disabled?: boolean;
   style?: ViewStyle;
 }
@@ -34,12 +42,20 @@ interface ChecklistCardProps {
 export const ChecklistCard: React.FC<ChecklistCardProps> = ({
   item,
   response,
+  evidences = [],
+  inspectionId,
+  inspectorName,
   onUpdateResponse,
+  onUploadEvidence,
+  onDeleteEvidence,
   disabled = false,
   style,
 }) => {
   const [showObservations, setShowObservations] = useState<boolean>(
     !!response?.observations && response.observations.trim().length > 0
+  );
+  const [showEvidenceSection, setShowEvidenceSection] = useState<boolean>(
+    evidences.length > 0
   );
 
   const numericValueStr = response?.val_numeric !== undefined && response?.val_numeric !== null
@@ -212,6 +228,64 @@ export const ChecklistCard: React.FC<ChecklistCardProps> = ({
           </View>
         )}
       </View>
+
+      {/* Evidencia Multimedia Adjunta al Ítem */}
+      <View style={styles.evidenceContainer}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => setShowEvidenceSection(!showEvidenceSection)}
+          style={styles.evidenceToggleBtn}
+        >
+          <View style={styles.obsToggleLeft}>
+            <Camera size={15} color={evidences.length > 0 ? '#2563eb' : '#475569'} />
+            <Text style={styles.obsToggleText}>
+              {evidences.length > 0
+                ? `Evidencia adjunta (${evidences.length})`
+                : 'Adjuntar evidencia (foto / video)'}
+            </Text>
+            {evidences.length > 0 && (
+              <Badge label={`${evidences.length}`} variant="blue" size="sm" />
+            )}
+          </View>
+          {showEvidenceSection ? (
+            <ChevronUp size={16} color="#64748b" />
+          ) : (
+            <ChevronDown size={16} color="#64748b" />
+          )}
+        </TouchableOpacity>
+
+        {showEvidenceSection && (
+          <View style={styles.evidenceContentWrapper}>
+            {/* Lista de miniaturas */}
+            {evidences.length > 0 && (
+              <View style={styles.evidenceThumbnailsRow}>
+                {evidences.map((ev) => (
+                  <EvidenceThumbnail
+                    key={ev.id}
+                    evidence={ev}
+                    disabled={disabled}
+                    onDelete={onDeleteEvidence}
+                  />
+                ))}
+              </View>
+            )}
+
+            {/* Subidor compacto de evidencia */}
+            {inspectionId && !disabled && (
+              <MediaUploader
+                inspectionId={inspectionId}
+                itemId={item.id}
+                inspectorName={inspectorName}
+                disabled={disabled}
+                onEvidenceUploaded={(ev) => {
+                  if (onUploadEvidence) onUploadEvidence(ev);
+                }}
+                compact
+              />
+            )}
+          </View>
+        )}
+      </View>
     </Card>
   );
 };
@@ -303,5 +377,26 @@ const styles = StyleSheet.create({
   },
   obsInputWrapper: {
     marginTop: 8,
+  },
+  evidenceContainer: {
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    paddingTop: 10,
+    marginTop: 8,
+  },
+  evidenceToggleBtn: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  evidenceContentWrapper: {
+    marginTop: 8,
+    gap: 8,
+  },
+  evidenceThumbnailsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
   },
 });

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 import {
   HierarchyTreeResponse,
   ChecklistTemplate,
@@ -14,10 +15,26 @@ import {
   NormativeReference,
   NormativeCurrencyReport,
   AuditLogEntry,
+  InspectionEvidence,
 } from './types';
 
 // Determinar URL del backend: En Web usa localhost:8000 por defecto
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+export const resolveMediaUrl = (url?: string | null): string | undefined => {
+  if (!url) return undefined;
+  if (
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.startsWith('blob:') ||
+    url.startsWith('data:')
+  ) {
+    return url;
+  }
+  const base = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+  const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+  return `${base}${cleanUrl}`;
+};
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -118,6 +135,62 @@ export const apiService = {
     offset?: number;
   }): Promise<AuditLogEntry[]> {
     const response = await apiClient.get<AuditLogEntry[]>('/audit-logs', { params });
+    return response.data;
+  },
+
+  // Evidencia Multimedia (Objetivo 3)
+  async uploadEvidence(
+    inspectionId: number,
+    file: { uri: string; name?: string; type?: string; blob?: Blob },
+    itemId?: number,
+    uploadedBy?: string
+  ): Promise<InspectionEvidence> {
+    const formData = new FormData();
+    const fileName = file.name || `evidence_${Date.now()}.${file.type?.includes('video') ? 'mp4' : 'jpg'}`;
+    const fileType = file.type || (fileName.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg');
+
+    if (Platform.OS === 'web' && file.blob) {
+      formData.append('file', file.blob, fileName);
+    } else if (Platform.OS === 'web' && file.uri.startsWith('blob:')) {
+      const resp = await fetch(file.uri);
+      const blob = await resp.blob();
+      formData.append('file', blob, fileName);
+    } else {
+      formData.append('file', {
+        uri: file.uri,
+        name: fileName,
+        type: fileType,
+      } as any);
+    }
+
+    if (itemId !== undefined && itemId !== null) {
+      formData.append('item_id', String(itemId));
+    }
+    if (uploadedBy) {
+      formData.append('uploaded_by', uploadedBy);
+    }
+
+    const response = await apiClient.post<InspectionEvidence>(
+      `/inspections/${inspectionId}/evidence`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return response.data;
+  },
+
+  async deleteEvidence(evidenceId: number): Promise<{ success: boolean; id: number; detail?: string }> {
+    const response = await apiClient.delete<{ success: boolean; id: number; detail?: string }>(
+      `/evidence/${evidenceId}`
+    );
+    return response.data;
+  },
+
+  async getEvidence(evidenceId: number): Promise<InspectionEvidence> {
+    const response = await apiClient.get<InspectionEvidence>(`/evidence/${evidenceId}`);
     return response.data;
   },
 };

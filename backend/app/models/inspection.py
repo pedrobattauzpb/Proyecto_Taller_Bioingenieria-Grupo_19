@@ -26,12 +26,9 @@ class Inspection(Base):
     # Campos reservados para fases futuras (Firma/Inspector y Adjuntos multimedia)
     inspector_id = Column(Integer, nullable=True)
     attachments = Column(JSON, nullable=True)
-    
-    component_id = Column(Integer, ForeignKey("components.id", ondelete="CASCADE"), nullable=True)
 
     # Relaciones
     asset = relationship("Asset", back_populates="inspections")
-    component = relationship("Component", back_populates="inspections")
     template = relationship("ChecklistTemplate", back_populates="inspections")
     responses = relationship("InspectionResponse", back_populates="inspection", cascade="all, delete-orphan")
     evidences = relationship("InspectionEvidence", back_populates="inspection", cascade="all, delete-orphan")

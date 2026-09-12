@@ -1,6 +1,6 @@
 import enum
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Enum
+from datetime import datetime, date
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -11,6 +11,9 @@ class AssetType(str, enum.Enum):
     TERMINAL_UNIT = "TERMINAL_UNIT"
     PRESSURE_REGULATOR = "PRESSURE_REGULATOR"
     GAS_CYLINDER = "GAS_CYLINDER"
+    PANEL_ALARMA = "PANEL_ALARMA"
+    POLIDUCTO = "POLIDUCTO"
+    COMPRESOR = "COMPRESOR"
 
 
 class Hospital(Base):
@@ -48,6 +51,9 @@ class Asset(Base):
     name = Column(String(255), nullable=False)
     asset_type = Column(Enum(AssetType), nullable=False, index=True)
     is_active = Column(Boolean, default=True, nullable=False)
+    serial_number = Column(String(100), nullable=True, index=True)
+    installation_date = Column(Date, nullable=True)
+    qr_code = Column(String(255), unique=True, index=True, nullable=True)
 
     # Relaciones
     sector = relationship("Sector", back_populates="assets")

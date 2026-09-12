@@ -14,6 +14,11 @@ from app.schemas.inspection import (
     InspectionBase, InspectionCreate, InspectionRead, InspectionDetailRead,
     InspectionCompleteRequest, InspectionHistoryItem, StatsOverviewResponse
 )
+from app.schemas.evidence import (
+    InspectionEvidenceBase,
+    InspectionEvidenceCreate,
+    InspectionEvidenceRead,
+)
 from app.schemas.compliance import (
     NormativeVersionBase, NormativeVersionCreate, NormativeVersionRead,
     NormativeReferenceBase, NormativeReferenceCreate, NormativeReferenceUpdate, NormativeReferenceRead,

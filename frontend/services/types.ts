@@ -3,11 +3,28 @@ export type AssetType =
   | 'AVSU_VALVE'
   | 'TERMINAL_UNIT'
   | 'PRESSURE_REGULATOR'
-  | 'GAS_CYLINDER';
+  | 'GAS_CYLINDER'
+  | 'PANEL_ALARMA'
+  | 'POLIDUCTO'
+  | 'COMPRESOR';
 
 export type ItemType = 'BOOLEAN' | 'NUMERIC' | 'TEXT';
 
 export type InspectionStatus = 'DRAFT' | 'IN_PROGRESS' | 'COMPLETED';
+
+export type FileType = 'IMAGE' | 'VIDEO';
+
+export interface InspectionEvidence {
+  id: number;
+  inspection_id: number;
+  item_id?: number | null;
+  file_type: FileType;
+  storage_url: string;
+  presigned_url?: string | null;
+  file_size_bytes?: number | null;
+  uploaded_at: string;
+  uploaded_by?: string | null;
+}
 
 export interface Asset {
   id: number;
@@ -15,6 +32,9 @@ export interface Asset {
   tag_code: string;
   name: string;
   asset_type: AssetType;
+  serial_number?: string | null;
+  installation_date?: string | null;
+  qr_code?: string | null;
   is_active: boolean;
 }
 
@@ -96,6 +116,7 @@ export interface InspectionDetail {
   asset?: Asset;
   template?: ChecklistTemplate;
   responses: InspectionResponse[];
+  evidences?: InspectionEvidence[];
   total_items: number;
   completed_items: number;
   progress_percentage: number;
@@ -217,6 +238,8 @@ export interface InspectionHistoryItem {
   total_items: number;
   evaluated_items: number;
   non_compliant_count: number;
+  notes?: string | null;
+  evidences?: InspectionEvidence[];
 }
 
 export interface StatsOverviewResponse {

@@ -87,6 +87,24 @@ export const HierarchySelector: React.FC<HierarchySelectorProps> = ({
           variant: 'emerald',
           icon: <Activity size={12} color="#059669" />,
         };
+      case 'PANEL_ALARMA':
+        return {
+          label: 'Panel de Alarma',
+          variant: 'rose',
+          icon: <Activity size={12} color="#e11d48" />,
+        };
+      case 'POLIDUCTO':
+        return {
+          label: 'Poliducto / Cabecera',
+          variant: 'indigo',
+          icon: <Activity size={12} color="#4f46e5" />,
+        };
+      case 'COMPRESOR':
+        return {
+          label: 'Compresor / Central',
+          variant: 'amber',
+          icon: <Gauge size={12} color="#d97706" />,
+        };
       default:
         return {
           label: type,

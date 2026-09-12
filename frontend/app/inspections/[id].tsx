@@ -26,6 +26,7 @@ import {
   InspectionDetail,
   InspectionResponse,
   ChecklistItem,
+  InspectionEvidence,
 } from '../../services/types';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
@@ -38,6 +39,8 @@ import { useComplianceValidation } from '../../hooks/useComplianceValidation';
 import { ComplianceAlertBanner } from '../../components/checklist/ComplianceAlertBanner';
 import { ComplianceSummaryCard } from '../../components/checklist/ComplianceSummaryCard';
 import { NormativeStatusIndicator } from '../../components/checklist/NormativeStatusIndicator';
+import { EvidenceThumbnail } from '../../components/checklist/EvidenceThumbnail';
+import { MediaUploader } from '../../components/checklist/MediaUploader';
 
 
 export default function InspectionScreen() {
@@ -47,6 +50,7 @@ export default function InspectionScreen() {
 
   const [inspection, setInspection] = useState<InspectionDetail | null>(null);
   const [responsesMap, setResponsesMap] = useState<Record<number, Partial<InspectionResponse>>>({});
+  const [evidences, setEvidences] = useState<InspectionEvidence[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,6 +77,7 @@ export default function InspectionScreen() {
       setError(null);
       const data = await apiService.getInspection(inspectionId);
       setInspection(data);
+      setEvidences(data.evidences || []);
 
       // Inicializar mapa de respuestas locales
       const map: Record<number, Partial<InspectionResponse>> = {};
@@ -85,6 +90,33 @@ export default function InspectionScreen() {
       setError('No se pudo cargar el detalle de la inspección. Verifique que el servidor esté activo.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUploadEvidence = (newEvidence: InspectionEvidence) => {
+    setEvidences((prev) => [newEvidence, ...prev]);
+    if (inspection) {
+      setInspection({
+        ...inspection,
+        evidences: [newEvidence, ...(inspection.evidences || [])],
+      });
+    }
+  };
+
+  const handleDeleteEvidence = async (evidenceId: number) => {
+    try {
+      await apiService.deleteEvidence(evidenceId);
+      setEvidences((prev) => prev.filter((e) => e.id !== evidenceId));
+      if (inspection) {
+        setInspection({
+          ...inspection,
+          evidences: (inspection.evidences || []).filter((e) => e.id !== evidenceId),
+        });
+      }
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || 'No se pudo eliminar la evidencia.';
+      Alert.alert('Error', detail);
+      throw err;
     }
   };
 
@@ -362,11 +394,50 @@ export default function InspectionScreen() {
               key={item.id}
               item={item}
               response={responsesMap[item.id] as InspectionResponse}
+              evidences={evidences.filter((e) => e.item_id === item.id)}
+              inspectionId={inspection.id}
+              inspectorName={inspection.inspector_name}
               onUpdateResponse={handleUpdateResponse}
+              onUploadEvidence={handleUploadEvidence}
+              onDeleteEvidence={handleDeleteEvidence}
               disabled={isCompleted}
             />
           ))}
         </View>
+
+        {/* Sección de Evidencia Multimedia General del Activo / Entorno */}
+        <Card style={styles.generalEvidenceCard}>
+          <View style={styles.generalEvidenceHeader}>
+            <Text style={styles.generalEvidenceTitle}>Evidencia Multimedia General</Text>
+            <Text style={styles.generalEvidenceSubtitle}>
+              Fotografías o videos panorámicos del área, estado físico o entorno del activo
+            </Text>
+          </View>
+
+          {evidences.filter((e) => !e.item_id).length > 0 && (
+            <View style={styles.generalEvidenceThumbnails}>
+              {evidences
+                .filter((e) => !e.item_id)
+                .map((ev) => (
+                  <EvidenceThumbnail
+                    key={ev.id}
+                    evidence={ev}
+                    disabled={isCompleted}
+                    onDelete={handleDeleteEvidence}
+                  />
+                ))}
+            </View>
+          )}
+
+          {!isCompleted && (
+            <MediaUploader
+              inspectionId={inspection.id}
+              inspectorName={inspection.inspector_name}
+              disabled={isCompleted}
+              onEvidenceUploaded={handleUploadEvidence}
+            />
+          )}
+        </Card>
 
         {/* Tarjeta Resumen de Cumplimiento Legal y Auditoría */}
         <ComplianceSummaryCard summary={complianceEvaluation} />
@@ -728,5 +799,29 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 10,
     marginTop: 6,
+  },
+  generalEvidenceCard: {
+    padding: 16,
+    gap: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+  },
+  generalEvidenceHeader: {
+    gap: 2,
+  },
+  generalEvidenceTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  generalEvidenceSubtitle: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  generalEvidenceThumbnails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
   },
 });

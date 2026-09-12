@@ -1,6 +1,5 @@
 from app.core.database import Base
 from app.models.hierarchy import AssetType, Hospital, Sector, Asset
-from app.models.assets import Component, ComponentType
 from app.models.checklist import ItemType, ChecklistTemplate, ChecklistItem
 from app.models.inspection import InspectionStatus, Inspection, InspectionResponse
 from app.models.evidence import InspectionEvidence, FileType
@@ -20,8 +19,6 @@ __all__ = [
     "Hospital",
     "Sector",
     "Asset",
-    "Component",
-    "ComponentType",
     "ItemType",
     "ChecklistTemplate",
     "ChecklistItem",

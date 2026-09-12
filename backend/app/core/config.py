@@ -25,6 +25,31 @@ class Settings(BaseSettings):
         "*"
     ]
 
+    # Object Storage (MinIO / S3 / Local fallback)
+    STORAGE_BACKEND: str = "minio"  # "minio" | "s3" | "local"
+    STORAGE_LOCAL_DIR: str = "./uploads/evidence"
+    MINIO_ENDPOINT: str = "http://localhost:9000"
+    MINIO_ACCESS_KEY: str = "minioadmin"
+    MINIO_SECRET_KEY: str = "minioadmin"
+    MINIO_BUCKET_NAME: str = "gases-medicinales-evidence"
+    MINIO_SECURE: bool = False
+
+    S3_BUCKET_NAME: str = "gases-medicinales-evidence"
+    S3_REGION: str = "us-east-1"
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+
+    PRESIGNED_URL_EXPIRATION_SECONDS: int = 3600  # 1 hora para visualización clínica segura
+    MAX_EVIDENCE_SIZE_BYTES: int = 25 * 1024 * 1024  # 25 MB
+    ALLOWED_MIME_TYPES: List[str] = [
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/heic",
+        "video/mp4",
+        "video/quicktime",
+    ]
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:

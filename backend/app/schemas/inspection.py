@@ -54,15 +54,18 @@ class InspectionRead(InspectionBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+from app.schemas.evidence import InspectionEvidenceRead
+
+
 class InspectionDetailRead(InspectionRead):
     responses: List[InspectionResponseRead] = []
+    evidences: List[InspectionEvidenceRead] = []
     total_items: int = 0
     completed_items: int = 0
     progress_percentage: float = 0.0
     compliance_summary: Optional[ComplianceSummary] = None
 
     model_config = ConfigDict(from_attributes=True)
-
 
 
 class InspectionCompleteRequest(BaseModel):
@@ -84,6 +87,8 @@ class InspectionHistoryItem(BaseModel):
     total_items: int
     evaluated_items: int
     non_compliant_count: int
+    notes: Optional[str] = None
+    evidences: List[InspectionEvidenceRead] = []
 
     model_config = ConfigDict(from_attributes=True)
 

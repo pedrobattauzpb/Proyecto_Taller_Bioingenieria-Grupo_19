@@ -23,6 +23,8 @@ ENV/
 backend/gases_medicinales.db
 .pytest_cache/
 backend/.pytest_cache/
+uploads/
+backend/uploads/
 .coverage
 htmlcov/
 

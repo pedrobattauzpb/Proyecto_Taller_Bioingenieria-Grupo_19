@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { CheckCircle2, AlertCircle, CloudCheck } from 'lucide-react-native';
+import { CheckCircle2, AlertCircle } from 'lucide-react-native';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 

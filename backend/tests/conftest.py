@@ -25,11 +25,6 @@ TestingSessionLocal = async_sessionmaker(
 )
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest.fixture(scope="function")
@@ -96,6 +91,14 @@ async def db_session():
 
 @pytest.fixture(scope="function")
 async def client(db_session):
+    from app.core.config import settings
+    from app.services.storage import storage_service
+
+    orig_backend = settings.STORAGE_BACKEND
+    settings.STORAGE_BACKEND = "local"
+    storage_service.backend = "local"
+    storage_service.s3_client = None
+
     async def override_get_db():
         yield db_session
 
@@ -104,3 +107,5 @@ async def client(db_session):
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()
+    settings.STORAGE_BACKEND = orig_backend
+

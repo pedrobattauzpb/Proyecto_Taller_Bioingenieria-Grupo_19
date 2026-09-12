@@ -9,6 +9,8 @@ from app.models.checklist import ChecklistTemplate, ChecklistItem, ItemType
 from app.models.inspection import Inspection, InspectionResponse, InspectionStatus
 from app.models.compliance import NormativeReference
 from app.schemas.inspection import StatsOverviewResponse, InspectionHistoryItem
+from app.schemas.evidence import InspectionEvidenceRead
+from app.services.storage import storage_service
 
 
 router = APIRouter()
@@ -125,7 +127,8 @@ async def get_asset_inspection_history(id: int, db: AsyncSession = Depends(get_d
         .options(
             joinedload(Inspection.asset),
             joinedload(Inspection.template).selectinload(ChecklistTemplate.items),
-            selectinload(Inspection.responses).joinedload(InspectionResponse.item)
+            selectinload(Inspection.responses).joinedload(InspectionResponse.item),
+            selectinload(Inspection.evidences)
         )
         .where(Inspection.asset_id == id)
         .order_by(Inspection.started_at.desc())
@@ -147,6 +150,21 @@ async def get_asset_inspection_history(id: int, db: AsyncSession = Depends(get_d
             )
         )
 
+        evidences_read = [
+            InspectionEvidenceRead(
+                id=ev.id,
+                inspection_id=ev.inspection_id,
+                item_id=ev.item_id,
+                file_type=ev.file_type,
+                storage_url=ev.storage_url,
+                presigned_url=storage_service.get_presigned_url(ev.storage_url),
+                file_size_bytes=ev.file_size_bytes,
+                uploaded_by=ev.uploaded_by,
+                uploaded_at=ev.uploaded_at
+            )
+            for ev in (insp.evidences or [])
+        ]
+
         history_items.append(
             InspectionHistoryItem(
                 id=insp.id,
@@ -159,10 +177,13 @@ async def get_asset_inspection_history(id: int, db: AsyncSession = Depends(get_d
                 status=insp.status,
                 started_at=insp.started_at,
                 completed_at=insp.completed_at,
+                notes=insp.notes,
                 total_items=total_items,
                 evaluated_items=evaluated_items,
-                non_compliant_count=non_compliant
+                non_compliant_count=non_compliant,
+                evidences=evidences_read
             )
         )
 
     return history_items
+
