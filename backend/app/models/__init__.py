@@ -1,7 +1,9 @@
 from app.core.database import Base
 from app.models.hierarchy import AssetType, Hospital, Sector, Asset
+from app.models.assets import Component, ComponentType
 from app.models.checklist import ItemType, ChecklistTemplate, ChecklistItem
 from app.models.inspection import InspectionStatus, Inspection, InspectionResponse
+from app.models.evidence import InspectionEvidence, FileType
 from app.models.compliance import (
     ComplianceStatus,
     ComplianceSeverity,
@@ -18,12 +20,16 @@ __all__ = [
     "Hospital",
     "Sector",
     "Asset",
+    "Component",
+    "ComponentType",
     "ItemType",
     "ChecklistTemplate",
     "ChecklistItem",
     "InspectionStatus",
     "Inspection",
     "InspectionResponse",
+    "InspectionEvidence",
+    "FileType",
     "ComplianceStatus",
     "ComplianceSeverity",
     "AuditEventType",
