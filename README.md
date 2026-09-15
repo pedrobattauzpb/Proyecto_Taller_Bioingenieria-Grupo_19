@@ -1,5 +1,7 @@
 # Protocolo de Inspección Digital de Gases Medicinales
 
+> 📘 **Documento Maestro de Arquitectura (SSOT):** Para especificaciones técnicas profundas, diagramas Mermaid (Sistemas, ERD relacional, flujo de secuencia) y contratos de API, consultar [ARQUITECTURA.md](file:///C:/Users/Santi/OneDrive/Documentos/Proyecto_Taller_Bioingenieria-Grupo_19/ARQUITECTURA.md).
+
 Sistema integral (GMAO / CMMS) para digitalizar, estandarizar y auditar el estado de las instalaciones hospitalarias y redes de distribución de gases medicinales (Oxígeno, Aire Medicinal, Vacío, Óxido Nitroso) bajo normativas **Resolución 1130/2000 del Ministerio de Salud de la Nación** y norma **ISO 7396-1:2016**.
 
 ## 🚀 Alcance de la Fase 1 (Objetivo Específico 1)
@@ -43,13 +45,13 @@ python -m app.db.seed_data
 uvicorn app.main:app --reload --port 8000
 ```
 
-#### 2. Frontend (Expo Web / Mobile)
+#### 2. Frontend (React 19 + Vite + Tailwind CSS v4)
 ```bash
 cd frontend
-pnpm web
-# o pnpm start para abrir en Expo Go (Android / iOS)
+npm install
+npm run dev
 ```
-- La aplicación se abrirá en `http://localhost:8081`.
+- La aplicación web se abrirá en `http://localhost:5173`.
 
 ---
 

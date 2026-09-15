@@ -1,6 +1,9 @@
 # Protocolo de Inspección Digital de Gases Medicinales
 ## Contexto, Arquitectura y Especificación Técnica del Proyecto (Grupo 19)
 
+> 📘 **Nota para Desarrolladores y Agentes de IA:**  
+> Para una visión arquitectónica exhaustiva con diagramas Mermaid (Arquitectura de Sistemas, Modelo ERD completo, Diagrama de Secuencia, Catálogo de Endpoints y Árbol de Componentes), consultar el documento maestro: [ARQUITECTURA.md](file:///C:/Users/Santi/OneDrive/Documentos/Proyecto_Taller_Bioingenieria-Grupo_19/ARQUITECTURA.md).
+
 ---
 
 ### 1. 🎯 Propósito y Dominio del Sistema
