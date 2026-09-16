@@ -91,15 +91,15 @@ export const ChecklistCard: React.FC<ChecklistCardProps> = ({
     (item.input_type === 'NUMERIC' && rangeCheck.out);
 
   const borderHighlight = isFailing
-    ? 'border-rose-400 bg-rose-50/20 shadow-xs'
+    ? 'border-rose-400 bg-rose-500/10 shadow-xs'
     : isAnswered
-    ? 'border-emerald-300 bg-white shadow-xs'
-    : 'border-slate-200 bg-white';
+    ? 'border-emerald-500/30 bg-[var(--surface)] shadow-xs'
+    : 'border-[var(--border)] bg-[var(--surface)]';
 
   const complianceEval = evaluateLocalCompliance(item, response);
 
   return (
-    <Card className={cn('flex flex-col gap-3.5 border-1.5 transition-all', borderHighlight, className)}>
+    <Card className={cn('flex flex-col gap-3.5 border transition-all', borderHighlight, className)}>
       {/* Encabezado del Ítem */}
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -111,14 +111,14 @@ export const ChecklistCard: React.FC<ChecklistCardProps> = ({
           <NormativeBadge reference={item.referencia_normativa} />
         </div>
 
-        <h4 className="text-sm sm:text-base font-bold text-slate-900 leading-snug">{item.title}</h4>
+        <h4 className="text-sm sm:text-base font-bold text-[var(--ink)] leading-snug">{item.title}</h4>
 
         {item.description && (
-          <p className="text-xs text-slate-500 leading-relaxed">{item.description}</p>
+          <p className="text-xs text-[var(--ink-soft)] leading-relaxed">{item.description}</p>
         )}
 
         {item.input_type === 'NUMERIC' && (item.min_value !== null || item.max_value !== null) && (
-          <div className="inline-flex items-center px-2.5 py-1 rounded-md bg-blue-50/80 border border-blue-200 text-[11px] font-semibold text-blue-800 self-start">
+          <div className="inline-flex items-center px-2.5 py-1 rounded-md bg-[var(--surface-2)] border border-[var(--border)] text-[11px] font-semibold text-[var(--ink-soft)] self-start">
             <span>
               Rango Nominal Requerido: {item.min_value ?? '-∞'} a {item.max_value ?? '+∞'} {item.unit || ''}
             </span>

@@ -35,18 +35,18 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const variantClasses: Record<ButtonVariant, string> = {
-    primary: 'bg-blue-600 hover:bg-blue-700 text-white border-blue-700 shadow-sm',
-    secondary: 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300 shadow-sm',
-    success: 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 shadow-sm',
-    danger: 'bg-rose-600 hover:bg-rose-700 text-white border-rose-700 shadow-sm',
-    outline: 'bg-transparent hover:bg-blue-50 text-blue-600 border-blue-500 border-1.5',
-    ghost: 'bg-transparent hover:bg-slate-100 text-slate-600 border-transparent',
+    primary: 'bg-[var(--accent)] hover:opacity-90 text-white border-transparent shadow-xs',
+    secondary: 'bg-[var(--surface-2)] hover:opacity-90 text-[var(--ink)] border border-[var(--border)] shadow-xs',
+    success: 'bg-[var(--ok)] hover:opacity-90 text-white border-transparent shadow-xs',
+    danger: 'bg-rose-600 hover:bg-rose-700 text-white border-transparent shadow-xs',
+    outline: 'bg-transparent hover:bg-[var(--surface-2)] text-[var(--accent)] border border-[var(--border)]',
+    ghost: 'bg-transparent hover:bg-[var(--surface-2)] text-[var(--ink-soft)] hover:text-[var(--ink)] border-transparent',
   };
 
   const sizeClasses = {
-    sm: 'px-3 py-1.5 text-xs min-h-[36px]',
-    md: 'px-4 py-2 text-sm min-h-[42px]',
-    lg: 'px-6 py-3 text-base min-h-[50px]',
+    sm: 'px-3 py-1.5 text-xs min-h-[34px]',
+    md: 'px-4 py-2 text-sm min-h-[38px]',
+    lg: 'px-6 py-2.5 text-base min-h-[44px]',
   };
 
   return (
@@ -55,10 +55,10 @@ export const Button: React.FC<ButtonProps> = ({
       onClick={handleClick}
       disabled={disabled || loading}
       className={cn(
-        'inline-flex items-center justify-center font-semibold rounded-xl border transition-all duration-150 cursor-pointer select-none active:scale-[0.98]',
+        'inline-flex items-center justify-center font-semibold rounded-lg border transition-all duration-150 cursor-pointer select-none active:scale-[0.98]',
         variantClasses[variant],
         sizeClasses[size],
-        (disabled || loading) && 'opacity-60 cursor-not-allowed active:scale-100 bg-slate-200 text-slate-400 border-slate-300',
+        (disabled || loading) && 'opacity-60 cursor-not-allowed active:scale-100 bg-[var(--surface-2)] text-[var(--ink-faint)] border-[var(--border)]',
         className
       )}
       {...rest}

@@ -48,19 +48,25 @@ Proyecto_Taller_Bioingenieria-Grupo_19/
 │   ├── Dockerfile
 │   └── requirements.txt
 │
-├── frontend/                 # Aplicación multiplataforma (Web / Tablet / Móvil)
-│   ├── app/                  # Navegación basada en archivos (Expo Router v4)
-│   │   ├── index.tsx         # Redirección inicial hacia el Dashboard
-│   │   ├── dashboard.tsx     # Vista principal: KPIs, selector jerárquico e inicio rápido
-│   │   ├── history.tsx       # Módulo de auditoría, trazabilidad y búsqueda histórica
-│   │   └── inspections/
-│   │       └── [id].tsx      # Pantalla interactiva de checklist y ejecución en campo
-│   ├── components/
-│   │   ├── checklist/        # ChecklistCard, AutoSaveIndicator, NormativeBadge
-│   │   ├── hierarchy/        # Selector jerárquico desplegable (Hospital -> Sector -> Activo)
-│   │   ├── layout/           # Header y Sidebar responsivos
-│   │   └── ui/               # Componentes atómicos (Button, Card, Badge, Input, ProgressBar)
-│   ├── services/             # api.ts (cliente Axios centralizado) y types.ts (interfaces TypeScript)
+├── frontend/                 # Aplicación multiplataforma (Web / Tablet / Móvil con Capacitor)
+│   ├── index.html            # Punto de entrada HTML5
+│   ├── vite.config.ts        # Configuración de Vite y proxies de desarrollo
+│   ├── src/
+│   │   ├── main.tsx          # Montaje raíz de React 19
+│   │   ├── App.tsx           # Configuración de rutas (React Router v7)
+│   │   ├── pages/            # Vistas principales:
+│   │   │   ├── DashboardPage.tsx   # Dashboard de KPIs, selector jerárquico e inicio rápido
+│   │   │   ├── HistoryPage.tsx     # Auditoría, trazabilidad y búsqueda histórica
+│   │   │   └── InspectionPage.tsx  # Pantalla interactiva de checklist y ejecución en campo
+│   │   ├── components/
+│   │   │   ├── checklist/    # ChecklistCard, AutoSaveIndicator, NormativeBadge, ComplianceAlertBanner, etc.
+│   │   │   ├── hierarchy/    # Selector jerárquico desplegable (Hospital -> Sector -> Activo)
+│   │   │   ├── history/      # ComponentHistoryTimeline
+│   │   │   ├── layout/       # Header, Sidebar responsivos y Layout principal
+│   │   │   └── ui/           # Componentes atómicos (Button, Card, Badge, Input, ProgressBar, SegmentedControl)
+│   │   ├── hooks/            # Hooks clínicos (useComplianceValidation, etc.)
+│   │   ├── services/         # api.ts (cliente Axios centralizado) y types.ts (interfaces TypeScript)
+│   │   └── lib/              # Utilidades auxiliares (cn, clsx, tailwind-merge)
 │   └── package.json
 │
 ├── docker-compose.yml        # Orquestación de contenedores (PostgreSQL 16 + FastAPI)
@@ -147,20 +153,22 @@ Proyecto_Taller_Bioingenieria-Grupo_19/
   - **Alembic** (migraciones de esquema relacional)
   - **Pytest + pytest-asyncio + HTTPX** (suite de tests de integración)
 - **Frontend:**
-  - **React Native (v0.76) + React 18**
-  - **Expo SDK 52** con **Expo Router v4** (enrutamiento declarativo)
-  - **React Native Web** (soporte nativo para navegadores de escritorio)
-  - **TypeScript**
-  - **Lucide Icons (`lucide-react-native`)**
-  - **Axios** para comunicación con la API
+  - **React 19 + TypeScript**
+  - **Vite** (bundler y servidor de desarrollo ultrarrápido)
+  - **Tailwind CSS v4** (sistema de diseño y utilitarios modernos)
+  - **React Router v7** (enrutamiento declarativo SPA)
+  - **Capacitor Ready** (empaquetado nativo para tablets y smartphones Android/iOS en campo)
+  - **Radix UI Primitives** (componentes accesibles y modales clínicos)
+  - **Lucide Icons (`lucide-react`)**
+  - **Axios** para comunicación asíncrona con la API REST
 - **Infraestructura:**
-  - **Docker & Docker Compose** (servicio de base de datos PostgreSQL 16 Alpine y contenedor de API FastAPI con migración y seed automáticos).
+  - **Docker & Docker Compose** (servicio de base de datos PostgreSQL 16 Alpine, MinIO y contenedor de API FastAPI con migración y seed automáticos).
 
 ---
 
 ### 7. 🚀 Guía de Ejecución Rápida
 
-#### Modo 1: Con Docker Compose (Recomendado)
+#### Modo 1: Con Docker Compose (Recomendado para entorno completo)
 ```bash
 docker-compose up --build
 ```
@@ -184,10 +192,10 @@ docker-compose up --build
 2. **Frontend:**
    ```bash
    cd frontend
-   pnpm install    # o npm install
-   pnpm web        # o npm run web
+   npm install     # o pnpm install
+   npm run dev     # Inicia servidor Vite
    ```
-   La aplicación web estará disponible en `http://localhost:8081`.
+   La aplicación web estará disponible en `http://localhost:5173` (con proxy reverso automático configurado hacia el backend en `http://localhost:8000`).
 
 3. **Ejecutar Pruebas Automatizadas:**
    ```bash

@@ -13,15 +13,15 @@ export const Card: React.FC<CardProps> = ({
   ...rest
 }) => {
   const variantClasses = {
-    default: 'bg-white border border-slate-200 shadow-sm',
-    elevated: 'bg-white border border-slate-200 shadow-md',
-    outlined: 'bg-white border-2 border-slate-300 shadow-none',
-    interactive: 'bg-white border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-400 transition-all duration-150',
+    default: 'bg-[var(--surface)] border border-[var(--border)] shadow-[var(--shadow)]',
+    elevated: 'bg-[var(--surface)] border border-[var(--border)] shadow-md',
+    outlined: 'bg-[var(--surface)] border-2 border-[var(--border)] shadow-none',
+    interactive: 'bg-[var(--surface)] border border-[var(--border)] shadow-[var(--shadow)] hover:border-[var(--accent)] transition-all duration-150',
   };
 
   return (
     <div
-      className={cn('rounded-2xl p-4 sm:p-5', variantClasses[variant], className)}
+      className={cn('rounded-xl p-4 sm:p-5 text-[var(--ink)] transition-colors', variantClasses[variant], className)}
       {...rest}
     >
       {children}

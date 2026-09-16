@@ -216,7 +216,7 @@ erDiagram
 sequenceDiagram
     autonumber
     actor Inspector as 👨‍⚕️ Bioingeniero / Inspector
-    participant UI as 📱 Frontend (Expo / Web)
+    participant UI as 📱 Frontend (React + Vite / Capacitor)
     participant API as ⚡ FastAPI Backend
     participant CE as ⚖️ ComplianceEngine
     participant S3 as 🪣 Object Storage
@@ -361,6 +361,6 @@ Cualquier IA o desarrollador que modifique o extienda este repositorio **DEBE** 
 4. **Desacoplamiento de Almacenamiento:**
    * Los archivos multimedia nunca se guardan como blobs en PostgreSQL. Se gestionan mediante `storage_service` (`StorageService`), delegando a MinIO/S3 o almacenamiento local según la configuración.
 5. **Tipado Estricto en Frontend:**
-   * Cada nuevo endpoint o modelo de datos debe reflejarse simultáneamente en `frontend/services/types.ts` y en `frontend/services/api.ts`.
-6. **Diseño Multiplataforma:**
-   * Los componentes de UI deben ser compatibles tanto con navegadores de escritorio (Web) como con dispositivos táctiles (Mobile / Expo Go). Evitar APIs exclusivas de React DOM que rompan en React Native.
+   * Cada nuevo endpoint o modelo de datos debe reflejarse simultáneamente en `frontend/src/services/types.ts` y en `frontend/src/services/api.ts`.
+6. **Diseño Multiplataforma (Web + Móvil con Capacitor):**
+   * Los componentes de UI deben ser totalmente responsivos y ergonómicos para uso táctil en tablets y smartphones en campo, optimizados para empaquetado móvil nativo mediante Capacitor y visualización en navegadores de escritorio.

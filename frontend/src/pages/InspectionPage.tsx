@@ -255,8 +255,8 @@ export const InspectionPage: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Sticky Header de la Inspección con Progreso y Auto-Save */}
-      <div className="sticky top-16 bg-white/95 backdrop-blur-xs z-20 border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
+      {/* Encabezado Principal de la Inspección con Progreso y Auto-Save */}
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 shadow-[var(--shadow)] flex flex-col gap-3 transition-colors">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Button
@@ -269,7 +269,7 @@ export const InspectionPage: React.FC = () => {
 
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base sm:text-lg font-black text-slate-900 m-0">
+                <h3 className="text-base sm:text-lg font-bold text-[var(--ink)] m-0">
                   {inspection.asset?.name || 'Activo Clínico'}
                 </h3>
                 <Badge label={inspection.asset?.tag_code || 'TAG'} variant="slate" size="sm" />
@@ -430,22 +430,44 @@ export const InspectionPage: React.FC = () => {
       {/* Resumen Ejecutivo de Compliance */}
       <ComplianceSummaryCard summary={complianceEvaluation} />
 
+      {/* Botón Inferior para Cerrar y Firmar Inspección */}
+      {!isCompleted && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-[var(--shadow)] transition-colors">
+          <div className="flex flex-col gap-0.5 text-center sm:text-left">
+            <span className="text-sm font-bold text-[var(--ink)]">
+              ¿Finalizaste la verificación técnica?
+            </span>
+            <span className="text-xs text-[var(--ink-soft)]">
+              {answeredCount} de {totalItems} ítems evaluados ({Math.round(currentProgress)}%). Sellarás el registro de forma inmutable.
+            </span>
+          </div>
+          <Button
+            title="Cerrar y Firmar Inspección"
+            variant="success"
+            size="md"
+            icon={<FileCheck2 className="w-5 h-5" />}
+            onClick={handleOpenCompleteModal}
+            className="w-full sm:w-auto px-6 py-2.5 font-bold"
+          />
+        </div>
+      )}
+
       {/* Modal de Cierre y Firma */}
       <Dialog.Root open={completeModalOpen} onOpenChange={setCompleteModalOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 animate-in fade-in" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 z-50 flex flex-col gap-4">
-            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+          <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 animate-in fade-in" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-[var(--surface)] text-[var(--ink)] rounded-2xl shadow-2xl border border-[var(--border)] p-6 z-50 flex flex-col gap-4">
+            <div className="flex justify-between items-center pb-2 border-b border-[var(--border)]">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                <Dialog.Title className="text-base font-bold text-slate-900">
+                <Dialog.Title className="text-base font-bold text-[var(--ink)]">
                   Completar y Sellar Inspección
                 </Dialog.Title>
               </div>
               <Dialog.Close asChild>
                 <button
                   type="button"
-                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+                  className="p-1.5 text-[var(--ink-soft)] hover:text-[var(--ink)] rounded-lg hover:bg-[var(--surface-2)] cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>

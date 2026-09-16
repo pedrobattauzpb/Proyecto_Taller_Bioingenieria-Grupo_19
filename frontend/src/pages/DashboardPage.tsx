@@ -2,28 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Activity,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  Play,
-  ShieldCheck,
+  Radio,
+  CircleDot,
+  Gauge,
   Layers,
-  FileSpreadsheet,
-  X,
+  ShieldCheck,
   RotateCw,
+  ChevronDown,
+  X,
+  Play,
+  AlertCircle,
+  FileSpreadsheet,
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { apiService } from '../services/api';
 import type {
   Hospital,
   Asset,
+  AssetType,
   StatsOverviewResponse,
 } from '../services/types';
-import { Card } from '../components/ui/Card';
-import { Badge } from '../components/ui/Badge';
-import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { HierarchySelector } from '../components/hierarchy/HierarchySelector';
+import { Button } from '../components/ui/Button';
+import { cn } from '../lib/utils';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -33,6 +34,11 @@ export const DashboardPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Jerarquía seleccionada
+  const [selectedHospitalId, setSelectedHospitalId] = useState<number | null>(null);
+  const [selectedSectorId, setSelectedSectorId] = useState<number | null>(null);
+
+  // Modal para iniciar inspección
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [inspectorName, setInspectorName] = useState<string>('Bioing. Santiago');
@@ -57,17 +63,21 @@ export const DashboardPage: React.FC = () => {
         const loadedHospitals = hierResult.value.hospitals;
         setHospitals(loadedHospitals);
 
-        setSelectedAsset((prev) => {
-          if (prev) {
-            for (const h of loadedHospitals) {
-              for (const s of h.sectors) {
-                const match = s.assets.find((a) => a.id === prev.id);
-                if (match) return match;
-              }
-            }
+        if (loadedHospitals.length > 0) {
+          const firstHospital = loadedHospitals[0];
+          setSelectedHospitalId((prev) =>
+            prev && loadedHospitals.some((h) => h.id === prev) ? prev : firstHospital.id
+          );
+
+          if (firstHospital.sectors.length > 0) {
+            setSelectedSectorId((prev) => {
+              const allSectors = loadedHospitals.flatMap((h) => h.sectors);
+              return prev && allSectors.some((s) => s.id === prev)
+                ? prev
+                : firstHospital.sectors[0].id;
+            });
           }
-          return loadedHospitals[0]?.sectors[0]?.assets[0] || null;
-        });
+        }
       } else {
         console.error('Error cargando jerarquía:', hierResult.reason);
         setError('No se pudo cargar la jerarquía de activos clínicos.');
@@ -85,6 +95,14 @@ export const DashboardPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const activeHospital =
+    hospitals.find((h) => h.id === selectedHospitalId) || hospitals[0] || null;
+
+  const activeSector =
+    activeHospital?.sectors.find((s) => s.id === selectedSectorId) ||
+    activeHospital?.sectors[0] ||
+    null;
 
   const handleStartInspectionModal = (asset: Asset) => {
     setSelectedAsset(asset);
@@ -110,210 +128,339 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
+  const getAssetTypeName = (type: AssetType): string => {
+    switch (type) {
+      case 'MANIFOLD':
+        return 'Manifold Central';
+      case 'AVSU_VALVE':
+        return 'Válvula AVSU';
+      case 'TERMINAL_UNIT':
+        return 'Boca Terminal';
+      case 'PRESSURE_REGULATOR':
+        return 'Regulador Presión';
+      case 'GAS_CYLINDER':
+        return 'Cilindro / Envase';
+      default:
+        return type;
+    }
+  };
+
+  const getAssetIcon = (type: AssetType) => {
+    switch (type) {
+      case 'MANIFOLD':
+        return <Activity className="w-3 h-3 shrink-0" />;
+      case 'AVSU_VALVE':
+        return <Radio className="w-3 h-3 shrink-0" />;
+      case 'TERMINAL_UNIT':
+        return <CircleDot className="w-3 h-3 shrink-0" />;
+      case 'PRESSURE_REGULATOR':
+        return <Gauge className="w-3 h-3 shrink-0" />;
+      case 'GAS_CYLINDER':
+        return <Layers className="w-3 h-3 shrink-0" />;
+      default:
+        return <Activity className="w-3 h-3 shrink-0" />;
+    }
+  };
+
   return (
-    <div className="flex flex-col gap-6">
-      {/* Encabezado del Dashboard */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 border-b border-slate-200">
+    <div className="flex flex-col gap-4">
+      {/* Topbar: Título y Badges Normativos */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight m-0">
+          <h1 className="text-xl font-bold tracking-tight text-[var(--ink)] m-0">
             Módulo de Inspección Digital de Gases
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
-            Auditoría clínica y verificación normativa bajo Res. MSAL 1130/2000 e ISO 7396-1
+          </h1>
+          <p className="text-sm text-[var(--ink-soft)] mt-0.5">
+            Auditoría clínica y verificación normativa
           </p>
         </div>
-        <Button
-          title="Actualizar Datos"
-          variant="outline"
-          size="sm"
-          onClick={loadDashboardData}
-          loading={loading}
-          icon={<RotateCw className="w-3.5 h-3.5" />}
-        />
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[11.5px] font-semibold py-1 px-2.5 rounded-full bg-[var(--surface-2)] text-[var(--ink-soft)] border border-[var(--border)]">
+            Res. MSAL 1130/2000
+          </span>
+          <span className="text-[11.5px] font-semibold py-1 px-2.5 rounded-full bg-[var(--surface-2)] text-[var(--ink-soft)] border border-[var(--border)]">
+            ISO 7396-1:2016
+          </span>
+          <span className="inline-flex items-center gap-1.5 bg-[var(--ok-soft)] text-[var(--ok)] py-1 px-2.5 rounded-full text-[11.5px] font-bold select-none">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--ok)] animate-pulse" />
+            <span>Red operativa</span>
+          </span>
+          <button
+            type="button"
+            onClick={loadDashboardData}
+            title="Actualizar datos"
+            disabled={loading}
+            className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--ink-soft)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)] cursor-pointer transition-all"
+          >
+            <RotateCw className={cn('w-4 h-4', loading && 'animate-spin')} />
+          </button>
+        </div>
       </div>
 
       {error && (
-        <Card className="flex items-center gap-3 p-4 bg-rose-50 border-rose-200 text-rose-800">
-          <AlertCircle className="w-5 h-5 shrink-0 text-rose-600" />
-          <p className="text-sm font-semibold">{error}</p>
-        </Card>
+        <div className="flex items-center gap-3 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <p className="text-sm font-semibold m-0">{error}</p>
+        </div>
       )}
 
-      {/* Tarjetas KPI de Actividad */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-        <Card className="flex flex-col justify-between gap-2 p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-400 tracking-wider">TOTAL ACTIVOS</span>
-            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Layers className="w-4 h-4" />
-            </div>
+      {/* Stat Strip: KPIs consolidados en una sola barra horizontal */}
+      <div className="stat-strip">
+        <div className="stat">
+          <div className="stat-value">
+            {stats?.active_assets ?? '-'}
           </div>
-          <span className="text-2xl font-black text-slate-900">{stats?.total_assets ?? '-'}</span>
-          <span className="text-[11px] text-slate-500 font-medium">En sectores clínicos</span>
-        </Card>
-
-        <Card className="flex flex-col justify-between gap-2 p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-400 tracking-wider">OPERATIVOS</span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Activity className="w-4 h-4" />
-            </div>
+          <div className="stat-label">
+            Activos operativos de {stats?.total_assets ?? '-'}
           </div>
-          <span className="text-2xl font-black text-emerald-600">{stats?.active_assets ?? '-'}</span>
-          <span className="text-[11px] text-slate-500 font-medium">100% de disponibilidad</span>
-        </Card>
-
-        <Card className="flex flex-col justify-between gap-2 p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-400 tracking-wider">AUDITORÍAS COMPLETAS</span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          </div>
-          <span className="text-2xl font-black text-emerald-700">{stats?.completed_inspections ?? 0}</span>
-          <span className="text-[11px] text-slate-500 font-medium">Conforme a norma</span>
-        </Card>
-
-        <Card className="flex flex-col justify-between gap-2 p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-400 tracking-wider">EN PROCESO</span>
-            <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <span className="text-2xl font-black text-amber-600">{stats?.in_progress_inspections ?? 0}</span>
-          <span className="text-[11px] text-slate-500 font-medium">Pendientes de cierre</span>
-        </Card>
-
-        <Card className="flex flex-col justify-between gap-2 p-4 col-span-2 sm:col-span-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-400 tracking-wider">CUMPLIMIENTO LEGAL</span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <ShieldCheck className="w-4 h-4" />
-            </div>
-          </div>
-          <span className="text-2xl font-black text-emerald-600">
-            {stats?.global_compliance_percentage !== undefined ? `${stats.global_compliance_percentage}%` : '100%'}
-          </span>
-          <span className="text-[11px] text-slate-500 font-medium">Auditoría algorítmica</span>
-        </Card>
-      </div>
-
-      {/* Disposición Principal en 2 Columnas (Desktop) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Columna Izquierda: Cascada de Selección de Activos */}
-        <div className="lg:col-span-7 flex flex-col gap-6">
-          <HierarchySelector
-            hospitals={hospitals}
-            loading={loading}
-            selectedAsset={selectedAsset}
-            onSelectAsset={(a) => setSelectedAsset(a)}
-            onStartInspection={handleStartInspectionModal}
-          />
         </div>
 
-        {/* Columna Derecha: Protocolos e Historial Reciente */}
-        <div className="lg:col-span-5 flex flex-col gap-5">
-          {/* Banner de Protocolos Normativos */}
-          <Card className="p-5 flex flex-col gap-3 border-blue-200 bg-blue-50/40">
-            <div className="flex items-center gap-2 text-blue-900 font-extrabold text-sm sm:text-base">
-              <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0" />
-              <span>Protocolos de Verificación Normativa</span>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Seleccione un activo a la izquierda o ejecute una auditoría inmediata bajo los estándares de bioingeniería:
-            </p>
+        <div className="stat">
+          <div className="stat-value warn">
+            {stats?.in_progress_inspections ?? 0}
+          </div>
+          <div className="stat-label">Auditorías en proceso</div>
+        </div>
 
-            <div className="flex flex-col gap-2.5 mt-1">
-              <div className="flex items-start gap-2 text-xs text-slate-700">
-                <Badge label="Res. 1130/2000" variant="indigo" size="sm" className="shrink-0" />
-                <span>Control de Envases/Cilindros de O2 y N2O (cruz griega, prueba hidráulica, rotulado).</span>
-              </div>
-              <div className="flex items-start gap-2 text-xs text-slate-700">
-                <Badge label="ISO 7396-1:2016" variant="emerald" size="sm" className="shrink-0" />
-                <span>Inspección de Redes Centrales, Manifolds (4.0-5.5 bar), Válvulas AVSU y Tomas Rápidas.</span>
-              </div>
-            </div>
-          </Card>
+        <div className="stat">
+          <div className="stat-value">
+            {stats?.completed_inspections ?? 0}
+          </div>
+          <div className="stat-label">Auditorías completas</div>
+        </div>
 
-          {/* Últimas Inspecciones Realizadas */}
-          <Card className="p-5 flex flex-col gap-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <h3 className="text-sm sm:text-base font-bold text-slate-900 m-0">Últimas Inspecciones</h3>
-              <Button
-                title="Ver Historial"
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/history')}
-              />
+        <div className="stat">
+          <div className="stat-value ok">
+            {stats?.global_compliance_percentage !== undefined
+              ? `${stats.global_compliance_percentage}%`
+              : '100%'}
+          </div>
+          <div className="stat-label">Cumplimiento legal</div>
+        </div>
+      </div>
+
+      {/* Breadcrumb Selector de Sectores */}
+      <div className="crumb">
+        {hospitals.length > 1 ? (
+          <select
+            value={activeHospital?.id || ''}
+            onChange={(e) => {
+              const hId = Number(e.target.value);
+              setSelectedHospitalId(hId);
+              const hosp = hospitals.find((h) => h.id === hId);
+              if (hosp && hosp.sectors.length > 0) {
+                setSelectedSectorId(hosp.sectors[0].id);
+              }
+            }}
+            className="crumb-item font-semibold text-[var(--ink)] bg-[var(--surface)] border-[var(--border)] outline-none py-1.5 px-3 rounded-full cursor-pointer"
+          >
+            {hospitals.map((h) => (
+              <option key={h.id} value={h.id}>
+                {h.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="crumb-item">
+            {activeHospital?.name || 'Hospital Dr. Arturo Oñativia'}
+          </div>
+        )}
+
+        <span className="crumb-sep">›</span>
+
+        {activeHospital?.sectors.map((sector) => {
+          const isCurrent = sector.id === activeSector?.id;
+          return (
+            <button
+              key={sector.id}
+              type="button"
+              onClick={() => setSelectedSectorId(sector.id)}
+              className={cn('crumb-item', isCurrent && 'current')}
+            >
+              <span>{sector.name}</span>
+              <span className="count">{sector.assets.length}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Layout Principal: 2 columnas (Grid de Activos + Sidebar consolidado) */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5 items-start">
+        {/* Columna Izquierda: Grilla de Activos del Sector */}
+        <div>
+          <div className="flex justify-between items-baseline mb-3">
+            <div>
+              <span className="text-[14.5px] font-bold text-[var(--ink)]">
+                Activos en {activeSector?.name || 'Sector'}
+              </span>
+              <span className="text-[12.5px] font-medium text-[var(--ink-faint)] ml-2">
+                {activeSector?.assets.length || 0} activos
+              </span>
+            </div>
+          </div>
+
+          {!activeSector || activeSector.assets.length === 0 ? (
+            <div className="p-8 rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] text-center flex flex-col items-center justify-center gap-2">
+              <FileSpreadsheet className="w-7 h-7 text-[var(--ink-faint)]" />
+              <p className="text-sm font-semibold text-[var(--ink)] m-0">
+                No hay activos registrados en este sector
+              </p>
+              <p className="text-xs text-[var(--ink-soft)] m-0">
+                Seleccione otro sector en la barra superior.
+              </p>
+            </div>
+          ) : (
+            <div className="asset-grid">
+              {activeSector.assets.map((asset) => (
+                <div key={asset.id} className="asset-card">
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-[var(--info)]">
+                      {getAssetIcon(asset.asset_type)}
+                      <span>{getAssetTypeName(asset.asset_type)}</span>
+                    </span>
+                    <span className="text-[10.5px] text-[var(--ink-faint)] font-semibold">
+                      {asset.tag_code}
+                    </span>
+                  </div>
+
+                  <div className="font-bold text-[13.5px] text-[var(--ink)] leading-snug line-clamp-2">
+                    {asset.name}
+                  </div>
+
+                  <div className="flex justify-between items-center mt-auto pt-2 border-t border-[var(--border)]">
+                    <span
+                      className={cn(
+                        'flex items-center gap-1.5 text-xs font-medium',
+                        asset.is_active ? 'text-[var(--ok)]' : 'text-[var(--ink-faint)]'
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'w-1.5 h-1.5 rounded-full',
+                          asset.is_active ? 'bg-[var(--ok)]' : 'bg-[var(--ink-faint)]'
+                        )}
+                      />
+                      <span>{asset.is_active ? 'Operativo' : 'Inactivo'}</span>
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => handleStartInspectionModal(asset)}
+                      className="text-[11.5px] font-semibold py-1.5 px-3 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 cursor-pointer transition-opacity"
+                    >
+                      Auditar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Columna Derecha: Sidebar de Inspecciones Recientes y Marco Normativo */}
+        <div className="flex flex-col gap-3.5">
+          {/* Tarjeta de Últimas Inspecciones */}
+          <div className="side-card">
+            <div className="side-head">
+              <span className="font-bold text-[13px] text-[var(--ink)]">
+                Últimas inspecciones
+              </span>
+              <button
+                type="button"
+                onClick={() => navigate('/inspections')}
+                className="text-[12px] font-semibold text-[var(--accent)] hover:underline cursor-pointer bg-transparent border-0 p-0"
+              >
+                Ver todas
+              </button>
             </div>
 
             {!stats?.recent_inspections || stats.recent_inspections.length === 0 ? (
-              <div className="p-6 text-center flex flex-col items-center justify-center gap-2">
-                <FileSpreadsheet className="w-8 h-8 text-slate-400" />
-                <p className="text-sm font-semibold text-slate-700">No hay inspecciones previas</p>
-                <p className="text-xs text-slate-500">
-                  Comience seleccionando un activo del panel izquierdo para crear el primer registro digital.
-                </p>
+              <div className="p-5 text-center text-xs text-[var(--ink-soft)]">
+                No hay inspecciones recientes registradas.
               </div>
             ) : (
-              <div className="flex flex-col gap-2.5">
-                {stats.recent_inspections.map((insp) => (
+              <div>
+                {stats.recent_inspections.slice(0, 5).map((insp) => (
                   <div
                     key={insp.id}
                     onClick={() => navigate(`/inspections/${insp.id}`)}
-                    className="p-3 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl cursor-pointer transition-all flex flex-col gap-1.5"
+                    className="insp-item cursor-pointer"
                   >
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1.5">
-                        <Badge label={insp.asset_tag} variant="slate" size="sm" />
-                        <Badge
-                          label={insp.status === 'COMPLETED' ? 'Completado' : 'En Curso'}
-                          variant={insp.status === 'COMPLETED' ? 'emerald' : 'amber'}
-                          size="sm"
-                        />
-                      </div>
-                      <span className="text-slate-400 font-medium">
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="font-semibold text-[var(--ink-faint)]">
+                        {insp.asset_tag} ·{' '}
                         {new Date(insp.started_at).toLocaleDateString()}
+                      </span>
+                      <span
+                        className={cn(
+                          'text-[10px] font-bold py-0.5 px-2 rounded-full',
+                          insp.status === 'COMPLETED'
+                            ? 'bg-[var(--ok-soft)] text-[var(--ok)]'
+                            : 'bg-[var(--warn-soft)] text-[var(--warn)]'
+                        )}
+                      >
+                        {insp.status === 'COMPLETED' ? 'Completado' : 'En curso'}
                       </span>
                     </div>
 
-                    <div className="text-sm font-bold text-slate-900">{insp.asset_name}</div>
-                    <div className="text-xs text-slate-500">{insp.template_title}</div>
+                    <div className="text-[12.5px] font-semibold text-[var(--ink)] line-clamp-1">
+                      {insp.asset_name}
+                    </div>
 
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-xs">
-                      <span className="text-slate-500">Auditor: {insp.inspector_name}</span>
-                      {insp.non_compliant_count > 0 ? (
-                        <Badge
-                          label={`${insp.non_compliant_count} No Conforme(s)`}
-                          variant="rose"
-                          size="sm"
-                        />
-                      ) : (
-                        <Badge label="100% Conforme" variant="emerald" size="sm" />
+                    <div className="text-[11.5px] text-[var(--ink-faint)]">
+                      Auditor: {insp.inspector_name}
+                    </div>
+
+                    <div
+                      className={cn(
+                        'text-[11px] font-semibold',
+                        insp.non_compliant_count > 0 ? 'text-[var(--warn)]' : 'text-[var(--ok)]'
                       )}
+                    >
+                      {insp.non_compliant_count > 0
+                        ? `${insp.non_compliant_count} No Conforme(s)`
+                        : '100% conforme'}
                     </div>
                   </div>
                 ))}
               </div>
             )}
-          </Card>
+          </div>
+
+          {/* Tarjeta de Marco Normativo Desplegable */}
+          <div className="side-card">
+            <details className="group">
+              <summary className="p-3.5 flex items-center gap-2 text-[var(--ink-soft)] text-[12.5px] font-semibold cursor-pointer select-none list-none hover:bg-[var(--surface-2)] transition-colors">
+                <ShieldCheck className="w-4 h-4 text-[var(--ink-faint)] shrink-0" />
+                <span>Marco normativo y protocolos</span>
+                <ChevronDown className="w-3.5 h-3.5 ml-auto transition-transform group-open:rotate-180 text-[var(--ink-faint)]" />
+              </summary>
+              <div className="px-3.5 pb-3.5 text-xs text-[var(--ink-soft)] leading-relaxed border-t border-[var(--border)] pt-2.5">
+                Auditoría de gases según{' '}
+                <b className="text-[var(--ink)]">Res. MSAL 1130/2000</b> (control de envases) y{' '}
+                <b className="text-[var(--ink)]">ISO 7396-1</b> (redes fijas). Verificación de cruz
+                griega, prueba hidráulica y rotulado en envases; presión de 4.0–5.5 bar y válvulas
+                AVSU en redes centrales.
+              </div>
+            </details>
+          </div>
         </div>
       </div>
 
       {/* Modal para Iniciar Inspección */}
       <Dialog.Root open={modalOpen} onOpenChange={setModalOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 animate-in fade-in" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 z-50 flex flex-col gap-4">
-            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-              <Dialog.Title className="text-base font-bold text-slate-900">
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 animate-in fade-in" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-[var(--surface)] text-[var(--ink)] rounded-2xl shadow-2xl border border-[var(--border)] p-6 z-50 flex flex-col gap-4">
+            <div className="flex justify-between items-center pb-2 border-b border-[var(--border)]">
+              <Dialog.Title className="text-base font-bold text-[var(--ink)] m-0">
                 Iniciar Nueva Inspección
               </Dialog.Title>
               <Dialog.Close asChild>
                 <button
                   type="button"
-                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+                  className="p-1.5 text-[var(--ink-soft)] hover:text-[var(--ink)] rounded-lg hover:bg-[var(--surface-2)] cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -321,14 +468,16 @@ export const DashboardPage: React.FC = () => {
             </div>
 
             {selectedAsset && (
-              <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl flex flex-col gap-1">
+              <div className="p-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl flex flex-col gap-1">
                 <div className="flex items-center gap-2">
-                  <Badge label={selectedAsset.tag_code} variant="indigo" size="sm" />
-                  <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
-                    {selectedAsset.asset_type}
+                  <span className="text-xs font-bold px-2 py-0.5 rounded bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                    {selectedAsset.tag_code}
+                  </span>
+                  <span className="text-[11px] text-[var(--ink-faint)] font-semibold uppercase tracking-wider">
+                    {getAssetTypeName(selectedAsset.asset_type)}
                   </span>
                 </div>
-                <div className="text-sm font-bold text-slate-900">{selectedAsset.name}</div>
+                <div className="text-sm font-bold text-[var(--ink)]">{selectedAsset.name}</div>
               </div>
             )}
 
@@ -348,7 +497,7 @@ export const DashboardPage: React.FC = () => {
               numberOfLines={2}
             />
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 mt-2">
+            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)] mt-2">
               <Button
                 title="Cancelar"
                 variant="secondary"

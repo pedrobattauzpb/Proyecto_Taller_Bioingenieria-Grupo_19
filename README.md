@@ -15,7 +15,7 @@ Sistema integral (GMAO / CMMS) para digitalizar, estandarizar y auditar el estad
 
 ## 🛠️ Stack Tecnológico
 
-- **Frontend:** React Native con Expo (Expo Router + Expo Web), TypeScript, Lucide Icons, diseño clínico adaptativo.
+- **Frontend:** React 19 con Vite, Tailwind CSS v4, TypeScript, Lucide Icons, Radix UI y soporte móvil con Capacitor.
 - **Backend:** Python 3.11+ con FastAPI (asíncrono), Pydantic v2, SQLAlchemy 2.0.
 - **Base de Datos:** PostgreSQL 16 / SQLite (desarrollo local) con migraciones Alembic.
 - **Infraestructura:** Docker Compose.
