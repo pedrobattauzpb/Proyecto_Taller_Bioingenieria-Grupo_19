@@ -61,17 +61,17 @@ export const ComponentHistoryTimeline: React.FC<ComponentHistoryTimelineProps> =
   if (loading) {
     return (
       <div className="p-8 text-center flex flex-col items-center justify-center gap-3">
-        <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm font-medium text-slate-500">Cargando historial técnico del componente...</p>
+        <div className="w-8 h-8 border-3 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-medium text-[var(--ink-soft)]">Cargando historial técnico del componente...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <Card className="p-6 text-center flex flex-col items-center justify-center gap-2 border-rose-200 bg-rose-50/50">
-        <AlertTriangle className="w-8 h-8 text-rose-600" />
-        <p className="text-sm font-semibold text-rose-800">{error}</p>
+      <Card className="p-6 text-center flex flex-col items-center justify-center gap-2 border-[var(--warn)] bg-[var(--warn-soft)]">
+        <AlertTriangle className="w-8 h-8 text-[var(--warn)]" />
+        <p className="text-sm font-semibold text-[var(--ink)]">{error}</p>
         <Button title="Reintentar" variant="outline" size="sm" onClick={loadHistory} />
       </Card>
     );
@@ -79,10 +79,10 @@ export const ComponentHistoryTimeline: React.FC<ComponentHistoryTimelineProps> =
 
   if (history.length === 0) {
     return (
-      <Card className="p-8 text-center flex flex-col items-center justify-center gap-2">
-        <FileCheck2 className="w-10 h-10 text-slate-400" />
-        <h3 className="text-base font-bold text-slate-800">Sin historial de inspecciones</h3>
-        <p className="text-xs sm:text-sm text-slate-500 max-w-sm">
+      <Card className="p-8 text-center flex flex-col items-center justify-center gap-2 bg-[var(--surface)] border border-[var(--border)]">
+        <FileCheck2 className="w-10 h-10 text-[var(--ink-faint)]" />
+        <h3 className="text-base font-bold text-[var(--ink)]">Sin historial de inspecciones</h3>
+        <p className="text-xs sm:text-sm text-[var(--ink-soft)] max-w-sm">
           Este activo aún no tiene listas de verificación registradas en el sistema centralizado.
         </p>
       </Card>
@@ -92,12 +92,12 @@ export const ComponentHistoryTimeline: React.FC<ComponentHistoryTimelineProps> =
   return (
     <div className="flex flex-col gap-4">
       {/* Header del Historial */}
-      <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200">
+      <div className="flex items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
         <div>
-          <h3 className="text-base font-bold text-slate-900">
+          <h3 className="text-base font-bold text-[var(--ink)]">
             Historial de Inspecciones {assetTag ? `(${assetTag})` : ''}
           </h3>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-[var(--ink-soft)]">
             {assetName || 'Activo Clínico'} • {history.length}{' '}
             {history.length === 1 ? 'inspección registrada' : 'inspecciones registradas'}
           </p>
@@ -105,7 +105,7 @@ export const ComponentHistoryTimeline: React.FC<ComponentHistoryTimelineProps> =
         <button
           type="button"
           onClick={loadHistory}
-          className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+          className="p-2 text-[var(--ink-soft)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)] rounded-lg transition-colors cursor-pointer"
           title="Refrescar historial"
         >
           <RotateCw className="w-4 h-4" />
@@ -113,7 +113,7 @@ export const ComponentHistoryTimeline: React.FC<ComponentHistoryTimelineProps> =
       </div>
 
       {/* Línea de Tiempo */}
-      <div className="flex flex-col gap-6 relative before:absolute before:left-3.5 before:top-4 before:bottom-4 before:w-0.5 before:bg-slate-200">
+      <div className="flex flex-col gap-6 relative before:absolute before:left-3.5 before:top-4 before:bottom-4 before:w-0.5 before:bg-[var(--border)]">
         {history.map((item) => {
           const isCompleted = item.status === 'COMPLETED';
           const hasDeviations = item.non_compliant_count > 0;
@@ -125,9 +125,9 @@ export const ComponentHistoryTimeline: React.FC<ComponentHistoryTimelineProps> =
                 className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 z-10 text-white shadow-xs ${
                   isCompleted
                     ? hasDeviations
-                      ? 'bg-amber-500'
-                      : 'bg-emerald-600'
-                    : 'bg-blue-600'
+                      ? 'bg-[var(--warn)]'
+                      : 'bg-[var(--ok)]'
+                    : 'bg-[var(--accent)]'
                 }`}
               >
                 {isCompleted ? (
@@ -143,11 +143,11 @@ export const ComponentHistoryTimeline: React.FC<ComponentHistoryTimelineProps> =
 
               {/* Tarjeta de Inspección */}
               <div className="flex-1">
-                <Card className="flex flex-col gap-3 p-4 hover:border-slate-300 transition-colors">
+                <Card className="flex flex-col gap-3 p-4 bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Badge label={`#${item.id}`} variant="slate" size="sm" />
-                      <span className="text-sm font-bold text-slate-900">{item.template_title}</span>
+                      <span className="text-sm font-bold text-[var(--ink)]">{item.template_title}</span>
                     </div>
 
                     <Badge
@@ -169,14 +169,14 @@ export const ComponentHistoryTimeline: React.FC<ComponentHistoryTimelineProps> =
                     />
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+                  <div className="flex flex-wrap items-center gap-4 text-xs text-[var(--ink-soft)]">
                     <div className="flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                      <Calendar className="w-3.5 h-3.5 text-[var(--ink-faint)]" />
                       <span>{new Date(item.started_at).toLocaleDateString()}</span>
                     </div>
 
                     <div className="flex items-center gap-1">
-                      <User className="w-3.5 h-3.5 text-slate-400" />
+                      <User className="w-3.5 h-3.5 text-[var(--ink-faint)]" />
                       <span>{item.inspector_name}</span>
                     </div>
                   </div>
@@ -200,14 +200,14 @@ export const ComponentHistoryTimeline: React.FC<ComponentHistoryTimelineProps> =
                   </div>
 
                   {item.notes && (
-                    <p className="text-xs text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100 italic">
+                    <p className="text-xs text-[var(--ink-soft)] bg-[var(--surface-2)] p-2 rounded-lg border border-[var(--border)] italic">
                       «{item.notes}»
                     </p>
                   )}
 
                   {item.evidences && item.evidences.length > 0 && (
-                    <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
-                      <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
+                    <div className="flex flex-col gap-2 pt-2 border-t border-[var(--border)]">
+                      <div className="flex items-center gap-1.5 text-xs text-[var(--ink-soft)] font-semibold">
                         <ImageIcon className="w-3.5 h-3.5" />
                         <span>
                           {item.evidences.length}{' '}

@@ -83,16 +83,16 @@ export const EvidenceThumbnail: React.FC<EvidenceThumbnailProps> = ({
       </Dialog.Trigger>
 
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-50 animate-in fade-in" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 z-50 flex flex-col gap-4">
-          <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-            <Dialog.Title className="text-base font-bold text-slate-900">
+        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 animate-in fade-in" />
+        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-[var(--surface)] text-[var(--ink)] rounded-2xl shadow-2xl border border-[var(--border)] p-6 z-50 flex flex-col gap-4">
+          <div className="flex justify-between items-center pb-2 border-b border-[var(--border)]">
+            <Dialog.Title className="text-base font-bold text-[var(--ink)]">
               Visualización de Evidencia Técnica
             </Dialog.Title>
             <Dialog.Close asChild>
               <button
                 type="button"
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+                className="p-1.5 text-[var(--ink-soft)] hover:text-[var(--ink)] rounded-lg hover:bg-[var(--surface-2)] cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -113,31 +113,31 @@ export const EvidenceThumbnail: React.FC<EvidenceThumbnailProps> = ({
                 className="max-h-[480px] w-auto max-w-full object-contain"
               />
             ) : (
-              <p className="text-slate-400 text-sm">URL no disponible</p>
+              <p className="text-[var(--ink-faint)] text-sm">URL no disponible</p>
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 py-2 px-3 bg-slate-50 rounded-xl text-xs text-slate-600 border border-slate-200">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 py-2 px-3 bg-[var(--surface-2)] rounded-xl text-xs text-[var(--ink-soft)] border border-[var(--border)]">
             <div className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <Clock className="w-3.5 h-3.5 text-[var(--ink-faint)] shrink-0" />
               <span>{new Date(evidence.uploaded_at).toLocaleString()}</span>
             </div>
             {evidence.uploaded_by && (
               <div className="flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <User className="w-3.5 h-3.5 text-[var(--ink-faint)] shrink-0" />
                 <span className="truncate">{evidence.uploaded_by}</span>
               </div>
             )}
             {evidence.file_size_bytes && (
               <div className="flex items-center gap-1.5">
-                <HardDrive className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <HardDrive className="w-3.5 h-3.5 text-[var(--ink-faint)] shrink-0" />
                 <span>{formatFileSize(evidence.file_size_bytes)}</span>
               </div>
             )}
           </div>
 
           {!disabled && onDelete && (
-            <div className="flex justify-end pt-2 border-t border-slate-100">
+            <div className="flex justify-end pt-2 border-t border-[var(--border)]">
               <button
                 type="button"
                 onClick={handleDelete}

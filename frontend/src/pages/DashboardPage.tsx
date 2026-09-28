@@ -13,6 +13,7 @@ import {
   Play,
   AlertCircle,
   FileSpreadsheet,
+  Clock,
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { apiService } from '../services/api';
@@ -24,6 +25,7 @@ import type {
 } from '../services/types';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
+import { ComponentHistoryTimeline } from '../components/history/ComponentHistoryTimeline';
 import { cn } from '../lib/utils';
 
 export const DashboardPage: React.FC = () => {
@@ -44,6 +46,10 @@ export const DashboardPage: React.FC = () => {
   const [inspectorName, setInspectorName] = useState<string>('Bioing. Santiago');
   const [inspectionNotes, setInspectionNotes] = useState<string>('');
   const [startingInspection, setStartingInspection] = useState<boolean>(false);
+
+  // Modal para ver historial técnico del activo
+  const [selectedHistoryAsset, setSelectedHistoryAsset] = useState<Asset | null>(null);
+  const [historyModalOpen, setHistoryModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     loadDashboardData();
@@ -107,6 +113,11 @@ export const DashboardPage: React.FC = () => {
   const handleStartInspectionModal = (asset: Asset) => {
     setSelectedAsset(asset);
     setModalOpen(true);
+  };
+
+  const handleOpenHistoryModal = (asset: Asset) => {
+    setSelectedHistoryAsset(asset);
+    setHistoryModalOpen(true);
   };
 
   const handleConfirmStartInspection = async () => {
@@ -344,13 +355,24 @@ export const DashboardPage: React.FC = () => {
                       <span>{asset.is_active ? 'Operativo' : 'Inactivo'}</span>
                     </span>
 
-                    <button
-                      type="button"
-                      onClick={() => handleStartInspectionModal(asset)}
-                      className="text-[11.5px] font-semibold py-1.5 px-3 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 cursor-pointer transition-opacity"
-                    >
-                      Auditar
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenHistoryModal(asset)}
+                        className="text-[11.5px] font-semibold py-1.5 px-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] text-[var(--ink)] hover:bg-[var(--surface-3)] cursor-pointer transition-colors flex items-center gap-1"
+                        title="Ver historial técnico"
+                      >
+                        <Clock className="w-3.5 h-3.5 text-[var(--ink-soft)]" />
+                        <span>Historial</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleStartInspectionModal(asset)}
+                        className="text-[11.5px] font-semibold py-1.5 px-3 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 cursor-pointer transition-opacity"
+                      >
+                        Auditar
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -512,6 +534,36 @@ export const DashboardPage: React.FC = () => {
                 loading={startingInspection}
               />
             </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* Modal para Historial Técnico del Activo */}
+      <Dialog.Root open={historyModalOpen} onOpenChange={setHistoryModalOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 animate-in fade-in" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-[var(--surface)] text-[var(--ink)] rounded-2xl shadow-2xl border border-[var(--border)] p-6 z-50 flex flex-col gap-4">
+            <div className="flex justify-between items-center pb-2 border-b border-[var(--border)]">
+              <Dialog.Title className="text-base font-bold text-[var(--ink)] m-0">
+                Historial Técnico del Activo
+              </Dialog.Title>
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  className="p-1.5 text-[var(--ink-soft)] hover:text-[var(--ink)] rounded-lg hover:bg-[var(--surface-2)] cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </Dialog.Close>
+            </div>
+
+            {selectedHistoryAsset && (
+              <ComponentHistoryTimeline
+                assetId={selectedHistoryAsset.id}
+                assetName={selectedHistoryAsset.name}
+                assetTag={selectedHistoryAsset.tag_code}
+              />
+            )}
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

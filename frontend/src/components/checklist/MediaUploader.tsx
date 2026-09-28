@@ -119,7 +119,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   }
 
   return (
-    <div className="flex flex-col gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+    <div className="flex flex-col gap-2 p-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl">
       <input
         ref={cameraInputRef}
         type="file"
@@ -159,20 +159,20 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
       </div>
 
       {uploadState === 'uploading' && (
-        <div className="flex items-center gap-2 text-xs text-blue-700 font-medium mt-1">
-          <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+        <div className="flex items-center gap-2 text-xs text-[var(--accent)] font-medium mt-1">
+          <Loader2 className="w-4 h-4 animate-spin text-[var(--accent)]" />
           <span>Subiendo archivo al almacenamiento seguro...</span>
         </div>
       )}
 
       {uploadState === 'success' && (
-        <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-semibold mt-1">
+        <div className="flex items-center gap-1.5 text-xs text-[var(--ok)] font-semibold mt-1">
           <span>✅ Evidencia multimedia adjuntada exitosamente.</span>
         </div>
       )}
 
       {uploadState === 'error' && (
-        <div className="flex items-start gap-1.5 text-xs text-rose-700 font-medium mt-1">
+        <div className="flex items-start gap-1.5 text-xs text-rose-600 font-medium mt-1">
           <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
           <div className="flex-1">
             <span>{errorMessage}</span>

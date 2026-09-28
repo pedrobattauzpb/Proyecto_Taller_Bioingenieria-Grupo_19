@@ -7,6 +7,7 @@ import {
   FileCheck2,
   Lock,
   X,
+  Clock,
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { apiService } from '../services/api';
@@ -28,6 +29,7 @@ import { ComplianceSummaryCard } from '../components/checklist/ComplianceSummary
 import { NormativeStatusIndicator } from '../components/checklist/NormativeStatusIndicator';
 import { EvidenceThumbnail } from '../components/checklist/EvidenceThumbnail';
 import { MediaUploader } from '../components/checklist/MediaUploader';
+import { ComponentHistoryTimeline } from '../components/history/ComponentHistoryTimeline';
 
 export const InspectionPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -50,6 +52,9 @@ export const InspectionPage: React.FC = () => {
   const [closingNotes, setClosingNotes] = useState<string>('');
   const [completing, setCompleting] = useState<boolean>(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+
+  // Modal de historial previo del activo
+  const [historyModalOpen, setHistoryModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (inspectionId > 0) {
@@ -283,8 +288,17 @@ export const InspectionPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 ml-auto">
+          <div className="flex items-center gap-2.5 ml-auto">
             <AutoSaveIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
+            {inspection.asset_id && (
+              <Button
+                title="Historial Previo"
+                variant="outline"
+                size="sm"
+                icon={<Clock className="w-4 h-4" />}
+                onClick={() => setHistoryModalOpen(true)}
+              />
+            )}
             {!isCompleted && (
               <Button
                 title="Cerrar y Firmar"
@@ -523,6 +537,36 @@ export const InspectionPage: React.FC = () => {
                 loading={completing}
               />
             </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* Modal para Consultar Antecedentes y Fotos Previas del Activo */}
+      <Dialog.Root open={historyModalOpen} onOpenChange={setHistoryModalOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 animate-in fade-in" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-[var(--surface)] text-[var(--ink)] rounded-2xl shadow-2xl border border-[var(--border)] p-6 z-50 flex flex-col gap-4">
+            <div className="flex justify-between items-center pb-2 border-b border-[var(--border)]">
+              <Dialog.Title className="text-base font-bold text-[var(--ink)] m-0">
+                Antecedentes e Historial del Componente
+              </Dialog.Title>
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  className="p-1.5 text-[var(--ink-soft)] hover:text-[var(--ink)] rounded-lg hover:bg-[var(--surface-2)] cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </Dialog.Close>
+            </div>
+
+            {inspection.asset_id && (
+              <ComponentHistoryTimeline
+                assetId={inspection.asset_id}
+                assetName={inspection.asset?.name}
+                assetTag={inspection.asset?.tag_code}
+              />
+            )}
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
