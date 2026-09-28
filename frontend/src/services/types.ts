@@ -274,3 +274,46 @@ export interface CompleteInspectionPayload {
   notes?: string;
   inspector_name?: string;
 }
+
+export interface SectorStat {
+  sector_id: number;
+  sector_name: string;
+  floor_level: string;
+  total_assets: number;
+  total_inspections: number;
+  completed_inspections: number;
+  compliance_percentage: number;
+}
+
+export interface AssetTypeStat {
+  asset_type: string;
+  total_assets: number;
+  total_inspections: number;
+  compliance_percentage: number;
+}
+
+export interface TopRiskAsset {
+  asset_id: number;
+  asset_name: string;
+  tag_code: string;
+  sector_name: string;
+  non_compliant_count: number;
+  critical_count: number;
+}
+
+export interface ExecutiveReportData {
+  hospital_name: string;
+  hospital_code: string;
+  generated_at: string;
+  total_sectors: number;
+  total_assets: number;
+  active_assets: number;
+  total_inspections: number;
+  completed_inspections: number;
+  in_progress_inspections: number;
+  global_compliance_percentage: number;
+  sector_stats: SectorStat[];
+  asset_type_stats: AssetTypeStat[];
+  severity_distribution: Record<string, number>;
+  top_risk_assets: TopRiskAsset[];
+}

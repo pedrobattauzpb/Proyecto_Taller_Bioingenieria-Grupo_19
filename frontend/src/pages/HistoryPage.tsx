@@ -6,8 +6,10 @@ import {
   Calendar,
   RotateCw,
   AlertCircle,
+  FileDown,
 } from 'lucide-react';
 import { apiService } from '../services/api';
+import { triggerBlobDownload } from '../utils/download';
 import type {
   InspectionDetail,
   InspectionStatus,
@@ -221,17 +223,38 @@ export const HistoryPage: React.FC = () => {
                   <div className="text-xs font-bold text-[var(--ink-soft)]">
                     {evaluatedCount} / {totalCount} evaluados ({insp.progress_percentage || 0}%)
                   </div>
-                  <Button
-                    title="Abrir Auditoría"
-                    size="sm"
-                    variant="outline"
-                    icon={<ChevronRight className="w-3.5 h-3.5" />}
-                    iconPosition="right"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/inspections/${insp.id}`);
-                    }}
-                  />
+                  <div className="flex items-center gap-1.5">
+                    {isCompleted && (
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            const blob = await apiService.downloadInspectionPDF(insp.id);
+                            triggerBlobDownload(blob, `Acta_Inspeccion_${insp.id}_${insp.asset?.tag_code || 'TAG'}.pdf`);
+                          } catch (err) {
+                            console.error('Error descargando PDF:', err);
+                            alert('No se pudo descargar el Acta en PDF.');
+                          }
+                        }}
+                        className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] text-[var(--ink-soft)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition-colors cursor-pointer"
+                        title="Descargar Acta de Inspección PDF"
+                      >
+                        <FileDown className="w-4 h-4" />
+                      </button>
+                    )}
+                    <Button
+                      title="Abrir Auditoría"
+                      size="sm"
+                      variant="outline"
+                      icon={<ChevronRight className="w-3.5 h-3.5" />}
+                      iconPosition="right"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/inspections/${insp.id}`);
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             );

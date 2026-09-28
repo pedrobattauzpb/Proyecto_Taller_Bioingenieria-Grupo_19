@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ClipboardList, Info, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Info, Sun, Moon, FileBarChart2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -22,6 +22,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
       label: 'Inspecciones',
       path: '/inspections',
       icon: ClipboardList,
+    },
+    {
+      label: 'Reportes y Auditoría',
+      path: '/reports',
+      icon: FileBarChart2,
     },
   ];
 

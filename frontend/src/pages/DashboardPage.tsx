@@ -14,6 +14,8 @@ import {
   AlertCircle,
   FileSpreadsheet,
   Clock,
+  FileText,
+  FileDown,
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { apiService } from '../services/api';
@@ -466,6 +468,36 @@ export const DashboardPage: React.FC = () => {
                 AVSU en redes centrales.
               </div>
             </details>
+          </div>
+
+          {/* Tarjeta de Informes y Actas de Inspección */}
+          <div className="side-card p-3.5 flex flex-col gap-2">
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-[13px] text-[var(--ink)] flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-[var(--accent)]" />
+                <span>Informes y Actas</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => navigate('/reports')}
+                className="text-[11.5px] font-semibold text-[var(--accent)] hover:underline cursor-pointer bg-transparent border-0 p-0"
+              >
+                Abrir módulo
+              </button>
+            </div>
+            <p className="text-[11.5px] text-[var(--ink-soft)] leading-snug m-0">
+              Genera actas técnicas oficiales en PDF/Excel y el informe ejecutivo de cumplimiento hospitalario.
+            </p>
+            <div className="pt-1">
+              <Button
+                title="Centro de Reportes"
+                variant="outline"
+                size="sm"
+                className="w-full text-xs"
+                icon={<FileDown className="w-3.5 h-3.5" />}
+                onClick={() => navigate('/reports')}
+              />
+            </div>
           </div>
         </div>
       </div>

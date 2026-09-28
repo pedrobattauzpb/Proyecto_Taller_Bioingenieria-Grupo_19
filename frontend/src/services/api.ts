@@ -15,6 +15,7 @@ import type {
   NormativeCurrencyReport,
   AuditLogEntry,
   InspectionEvidence,
+  ExecutiveReportData,
 } from './types';
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
@@ -191,6 +192,55 @@ export const apiService = {
 
   async getEvidence(evidenceId: number): Promise<InspectionEvidence> {
     const response = await apiClient.get<InspectionEvidence>(`/evidence/${evidenceId}`);
+    return response.data;
+  },
+
+  // --- Motor de Reportes (Objetivo 4) ---
+
+  async downloadInspectionPDF(inspectionId: number): Promise<Blob> {
+    const response = await apiClient.get(`/reports/inspections/${inspectionId}/pdf`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  async downloadInspectionExcel(inspectionId: number): Promise<Blob> {
+    const response = await apiClient.get(`/reports/inspections/${inspectionId}/excel`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  async downloadAssetHistoryPDF(assetId: number): Promise<Blob> {
+    const response = await apiClient.get(`/reports/assets/${assetId}/history-pdf`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  async downloadExecutivePDF(hospitalId?: number): Promise<Blob> {
+    const params = hospitalId ? { hospital_id: hospitalId } : {};
+    const response = await apiClient.get('/reports/executive/pdf', {
+      params,
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  async downloadExecutiveExcel(hospitalId?: number): Promise<Blob> {
+    const params = hospitalId ? { hospital_id: hospitalId } : {};
+    const response = await apiClient.get('/reports/executive/excel', {
+      params,
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  async getExecutiveReportData(hospitalId?: number): Promise<ExecutiveReportData> {
+    const params = hospitalId ? { hospital_id: hospitalId } : {};
+    const response = await apiClient.get<ExecutiveReportData>('/reports/executive/data', {
+      params,
+    });
     return response.data;
   },
 };

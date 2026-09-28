@@ -8,9 +8,12 @@ import {
   Lock,
   X,
   Clock,
+  FileDown,
+  FileSpreadsheet,
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { apiService } from '../services/api';
+import { triggerBlobDownload } from '../utils/download';
 import type {
   InspectionDetail,
   InspectionResponse,
@@ -55,6 +58,38 @@ export const InspectionPage: React.FC = () => {
 
   // Modal de historial previo del activo
   const [historyModalOpen, setHistoryModalOpen] = useState<boolean>(false);
+
+  // Estados de descarga de reportes (Objetivo 4)
+  const [downloadingPdf, setDownloadingPdf] = useState<boolean>(false);
+  const [downloadingExcel, setDownloadingExcel] = useState<boolean>(false);
+
+  const handleDownloadPdf = async () => {
+    try {
+      setDownloadingPdf(true);
+      const blob = await apiService.downloadInspectionPDF(inspectionId);
+      const safeTag = inspection?.asset?.tag_code || 'ACTIVO';
+      triggerBlobDownload(blob, `Acta_Inspeccion_${inspectionId}_${safeTag}.pdf`);
+    } catch (err) {
+      console.error('Error descargando PDF:', err);
+      alert('Error al generar o descargar el Acta en PDF.');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
+  const handleDownloadExcel = async () => {
+    try {
+      setDownloadingExcel(true);
+      const blob = await apiService.downloadInspectionExcel(inspectionId);
+      const safeTag = inspection?.asset?.tag_code || 'ACTIVO';
+      triggerBlobDownload(blob, `Inspeccion_${inspectionId}_${safeTag}.xlsx`);
+    } catch (err) {
+      console.error('Error descargando Excel:', err);
+      alert('Error al exportar los datos a Excel.');
+    } finally {
+      setDownloadingExcel(false);
+    }
+  };
 
   useEffect(() => {
     if (inspectionId > 0) {
@@ -288,17 +323,33 @@ export const InspectionPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 ml-auto">
+          <div className="flex items-center gap-2 flex-wrap ml-auto">
             <AutoSaveIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
             {inspection.asset_id && (
               <Button
-                title="Historial Previo"
+                title="Historial"
                 variant="outline"
                 size="sm"
                 icon={<Clock className="w-4 h-4" />}
                 onClick={() => setHistoryModalOpen(true)}
               />
             )}
+            <Button
+              title="Acta PDF"
+              variant="outline"
+              size="sm"
+              icon={<FileDown className="w-4 h-4" />}
+              onClick={handleDownloadPdf}
+              loading={downloadingPdf}
+            />
+            <Button
+              title="Excel"
+              variant="outline"
+              size="sm"
+              icon={<FileSpreadsheet className="w-4 h-4" />}
+              onClick={handleDownloadExcel}
+              loading={downloadingExcel}
+            />
             {!isCompleted && (
               <Button
                 title="Cerrar y Firmar"
