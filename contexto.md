@@ -42,7 +42,7 @@ Su objetivo principal es digitalizar, estandarizar y auditar de forma integral l
 | **OE-1** | Listas de verificación digitales dinámicas con trazabilidad normativa explícita, soporte táctil y auto-guardado atómico | ✅ Completado |
 | **OE-2** | Motor de cumplimiento normativo en tiempo real (`ComplianceEngine`), catálogo de normas vigentes, alertas de severidad y bitácora de auditoría inmutable | ✅ Completado |
 | **OE-3** | Base de datos centralizada con historial detallado de inspección por componente y soporte de evidencia multimedia (fotos/videos) | ✅ Completado |
-| **OE-4** | Motor de reportes que genere informes estructurados automáticos sobre el estado de la infraestructura respecto a las normativas | 🔲 Pendiente |
+| **OE-4** | Motor de reportes que genere informes estructurados automáticos sobre el estado de la infraestructura respecto a las normativas | ✅ Completado |
 
 ---
 
@@ -60,6 +60,8 @@ Proyecto_Taller_Bioingenieria-Grupo_19/
 │   │   │   ├── inspections.py   #   Ciclo de vida completo de inspecciones
 │   │   │   ├── compliance.py    #   Validación de cumplimiento y bitácora
 │   │   │   ├── normatives.py    #   Catálogo y vigencia de normas
+│   │   │   ├── evidence.py      #   Carga, consulta y borrado de evidencias
+│   │   │   ├── reports.py       #   Actas PDF/Excel, historial e informe ejecutivo
 │   │   │   └── stats.py         #   KPIs y métricas hospitalarias
 │   │   ├── core/                # Configuración (pydantic-settings), CORS, DB engine
 │   │   ├── db/                  # Inicializador de datos y seed normativo completo
@@ -73,12 +75,18 @@ Proyecto_Taller_Bioingenieria-Grupo_19/
 │   │   ├── schemas/             # Pydantic v2 (validación y serialización)
 │   │   └── services/            # Capa de lógica de negocio:
 │   │       ├── compliance_engine.py   # Motor de cumplimiento normativo
-│   │       └── storage.py             # Servicio de almacenamiento multimedia
-│   ├── tests/                   # 13 tests (pytest-asyncio + httpx):
+│   │       ├── storage.py             # Servicio de almacenamiento multimedia
+│   │       └── report_engine/         # Motor de reportes (OE-4):
+│   │           ├── data_assembler.py  #   Agregación de datos inspección/activo/ejecutivo
+│   │           ├── pdf_generator.py   #   Actas e informes PDF (ReportLab)
+│   │           ├── excel_generator.py #   Libros Excel multi-hoja (openpyxl)
+│   │           └── styles.py          #   Paleta y estilos tipográficos institucionales
+│   ├── tests/                   # 20 tests (pytest-asyncio + httpx):
 │   │   ├── test_api.py          #   Liveness, jerarquía, plantillas, ciclo de inspección
 │   │   ├── test_compliance.py   #   ComplianceEngine, severidades, audit logs
 │   │   ├── test_evidence_and_history.py  # MIME validation, historial de activo
-│   │   └── test_objective_3.py  #   Evidence upload, inmutabilidad, timeline
+│   │   ├── test_objective_3.py  #   Evidence upload, inmutabilidad, timeline
+│   │   └── test_objective_4.py  #   Actas PDF/Excel, historial PDF, informe ejecutivo
 │   ├── uploads/evidence/        # Almacenamiento local de archivos multimedia
 │   ├── gases_medicinales.db     # Base de datos SQLite de desarrollo
 │   ├── requirements.txt
@@ -91,8 +99,10 @@ Proyecto_Taller_Bioingenieria-Grupo_19/
 │   │   │   ├── DashboardPage.tsx    # KPIs, selector jerárquico, grilla de activos,
 │   │   │   │                        # historial por componente y inicio de inspección
 │   │   │   ├── HistoryPage.tsx      # Catálogo de inspecciones con búsqueda y filtros
-│   │   │   └── InspectionPage.tsx   # Checklist interactivo, auto-save, compliance
-│   │   │                            # en vivo, multimedia, cierre y sellado
+│   │   │   ├── InspectionPage.tsx   # Checklist interactivo, auto-save, compliance
+│   │   │   │                        # en vivo, multimedia, cierre y sellado
+│   │   │   └── ReportsPage.tsx      # Centro de reportes: informe ejecutivo, KPIs
+│   │   │                            # por sector/tipo, descarga de actas PDF/Excel
 │   │   ├── components/
 │   │   │   ├── checklist/       # ChecklistCard, AutoSaveIndicator, ComplianceBadge,
 │   │   │   │                    # ComplianceAlertBanner, ComplianceSummaryCard,
@@ -216,6 +226,12 @@ El motor reside en `backend/app/services/compliance_engine.py` y opera como un s
 | **Normativas** | `PUT` | `/api/v1/normatives/{id}` | Actualiza norma (dar de baja, superseded_by). |
 | **Normativas** | `GET` | `/api/v1/normatives/templates/{id}/currency-check` | Verifica vigencia de normas del checklist. |
 | **Historial** | `GET` | `/api/v1/assets/{id}/history` | Línea de tiempo de inspecciones de un activo. |
+| **Reportes** | `GET` | `/api/v1/reports/inspections/{id}/pdf` | Acta de Inspección Técnica en PDF. |
+| **Reportes** | `GET` | `/api/v1/reports/inspections/{id}/excel` | Auditoría completa en Excel (.xlsx). |
+| **Reportes** | `GET` | `/api/v1/reports/assets/{id}/history-pdf` | Informe histórico del componente en PDF. |
+| **Reportes** | `GET` | `/api/v1/reports/executive/pdf` | Informe ejecutivo institucional en PDF. |
+| **Reportes** | `GET` | `/api/v1/reports/executive/excel` | Informe ejecutivo institucional en Excel. |
+| **Reportes** | `GET` | `/api/v1/reports/executive/data` | Métricas ejecutivas en JSON para gráficos. |
 | **Estadísticas** | `GET` | `/api/v1/stats` | KPIs (activos, inspecciones, compliance global). |
 
 ---
@@ -228,7 +244,9 @@ El motor reside en `backend/app/services/compliance_engine.py` y opera como un s
   - **Pydantic v2 & Pydantic-Settings**
   - **SQLAlchemy 2.0 (Async)** con motor `asyncpg` (PostgreSQL) y fallback a `aiosqlite` (desarrollo local)
   - **Alembic** (4 migraciones versionadas)
-  - **Pytest + pytest-asyncio + HTTPX** (13 tests, 100% passing)
+  - **ReportLab** (generación de actas e informes PDF)
+  - **openpyxl** (exportación multi-hoja a Excel)
+  - **Pytest + pytest-asyncio + HTTPX** (20 tests, 100% passing)
   - **boto3** (integración S3/MinIO para almacenamiento multimedia)
   - **python-multipart** (procesamiento de uploads)
 - **Frontend:**

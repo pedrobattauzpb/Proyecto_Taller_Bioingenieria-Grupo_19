@@ -2,7 +2,7 @@
 
 > **Documento Maestro de Arquitectura y Especificación Técnica (SSOT)**  
 > *Diseñado como referencia integral para desarrolladores, bioingenieros y agentes de Inteligencia Artificial.*  
-> *Última actualización técnica: 28 de Septiembre de 2026 — Objetivos 1, 2 y 3 completados.*
+> *Última actualización técnica: 29 de Septiembre de 2026 — Objetivos 1, 2, 3 y 4 completados.*
 
 ---
 
@@ -28,7 +28,7 @@ El proyecto es un **GMAO / CMMS (Gestión de Mantenimiento Asistido por Ordenado
 | **1** | Checklists digitales dinámicos con trazabilidad normativa, soporte táctil y auto-guardado | ✅ Completado |
 | **2** | Motor de cumplimiento normativo en tiempo real, catálogo de normas vigentes, alertas de severidad, bitácora inmutable | ✅ Completado |
 | **3** | Historial centralizado por componente con evidencia multimedia (fotos/videos) | ✅ Completado |
-| **4** | Motor de reportes con generación automática de informes estructurados | 🔲 Pendiente |
+| **4** | Motor de reportes con generación automática de informes estructurados | ✅ Completado |
 
 ---
 
@@ -42,11 +42,12 @@ flowchart TB
     end
 
     subgraph BACKEND["⚡ Backend Asíncrono (FastAPI + Python 3.11)"]
-        ROUTERS["API Routers (v1)\n/hierarchy, /checklists, /inspections,\n/compliance, /normatives, /stats,\n/evidence, /audit-logs"]
+        ROUTERS["API Routers (v1)\n/hierarchy, /checklists, /inspections,\n/compliance, /normatives, /stats,\n/evidence, /audit-logs, /reports"]
         
         subgraph SERVICIOS["Capa de Servicios de Negocio"]
             COMP_ENG["⚖️ ComplianceEngine\n(Validador Normativo en Tiempo Real)\n• Evaluación booleana/numérica/texto\n• Banda de alerta preventiva (10%)\n• Clasificación CRITICAL/MAJOR/MINOR\n• Vigencia normativa (currency check)"]
             STORAGE_SVC["📦 StorageService\n(Gestor de Archivos Multimedia)\n• S3 / MinIO / Disco Local\n• Validación MIME (image/*, video/*)\n• Límite 25 MB\n• URLs prefirmadas"]
+            REPORT_ENG["📄 ReportEngine\n(Motor de Informes Automáticos)\n• Acta de Inspección (PDF A4 / XLSX)\n• Historial cronológico por activo\n• Informe ejecutivo institucional\n• KPIs por sector, tipo y severidad"]
         end
 
         ORM["SQLAlchemy 2.0 Async\n(asyncpg / aiosqlite fallback)"]
@@ -329,6 +330,12 @@ sequenceDiagram
 | **Normativas** | `PUT` | `/api/v1/normatives/{id}` | `NormativeReferenceUpdate` | `NormativeReferenceRead` | Actualiza norma. |
 | **Normativas** | `GET` | `/api/v1/normatives/templates/{id}/currency-check` | Path | `NormativeCurrencyReport` | Vigencia normativa del checklist. |
 | **Historial** | `GET` | `/api/v1/assets/{id}/history` | Path | `List[InspectionHistoryItem]` | Timeline de un activo. |
+| **Reportes** | `GET` | `/api/v1/reports/inspections/{id}/pdf` | Path | `StreamingResponse` (PDF) | Acta de Inspección Técnica A4 (ficha, dictamen, tabla semáforo, desvíos, evidencias, firma). |
+| **Reportes** | `GET` | `/api/v1/reports/inspections/{id}/excel` | Path | `StreamingResponse` (XLSX) | Exportación tabular (hojas Resumen, Checklist, Evidencias). |
+| **Reportes** | `GET` | `/api/v1/reports/assets/{id}/history-pdf` | Path | `StreamingResponse` (PDF) | Informe histórico del componente con evolución y fallas recurrentes. |
+| **Reportes** | `GET` | `/api/v1/reports/executive/pdf` | `hospital_id` | `StreamingResponse` (PDF) | Informe ejecutivo institucional para Dirección Médica. |
+| **Reportes** | `GET` | `/api/v1/reports/executive/excel` | `hospital_id` | `StreamingResponse` (XLSX) | KPIs globales, tablas por sector y por tipo de activo. |
+| **Reportes** | `GET` | `/api/v1/reports/executive/data` | `hospital_id` | `ExecutiveReportData` | Métricas agregadas en JSON para los gráficos de la UI. |
 | **Estadísticas** | `GET` | `/api/v1/stats` | — | `StatsOverviewResponse` | KPIs para Dashboard. |
 
 ---
@@ -408,6 +415,7 @@ flowchart LR
   * `/dashboard` → `DashboardPage.tsx`
   * `/inspections` → `HistoryPage.tsx`
   * `/inspections/:id` → `InspectionPage.tsx`
+  * `/reports` → `ReportsPage.tsx`
   * `/history` → Redirección a `/inspections`
   * `*` → Redirección a `/dashboard`
 
@@ -442,6 +450,14 @@ flowchart LR
 - **Resumen ejecutivo** (`ComplianceSummaryCard`): Conformes, No Conformes, Advertencias, Pendientes.
 - **Modales:** Cierre y sellado (validación obligatoriedad), Historial previo del activo.
 
+#### `ReportsPage.tsx` — Centro de Reportes y Analítica
+- **Selector de hospital y refresco:** carga las métricas ejecutivas vía `GET /reports/executive/data`.
+- **Grilla de KPIs:** porcentaje de cumplimiento global, activos auditados, no conformidades y vigencia normativa.
+- **Panel de gráficos (`components/reports/`):** `SectorComplianceChart`, `AssetTypeComplianceChart` y `SeverityPieChart` (Recharts).
+- **Descargas institucionales:** Informe Ejecutivo en PDF y Excel.
+- **Descarga de actas puntuales:** ingreso de ID de inspección para emitir el Acta PDF o el Excel de esa auditoría.
+- **Listado de últimas inspecciones completadas** con acceso directo a la descarga y al detalle.
+
 ### Biblioteca de Componentes (`src/components/`)
 
 | Carpeta | Componentes | Descripción |
@@ -450,6 +466,7 @@ flowchart LR
 | **`checklist/`** | `ChecklistCard`, `AutoSaveIndicator`, `ComplianceBadge`, `ComplianceAlertBanner`, `ComplianceSummaryCard`, `NormativeStatusIndicator`, `MediaUploader`, `EvidenceThumbnail` | Componentes de dominio para auditoría, compliance y multimedia. |
 | **`hierarchy/`** | `HierarchySelector` | Selector en cascada Hospital → Sector → Activo. |
 | **`history/`** | `ComponentHistoryTimeline` | Línea de tiempo vertical con nodos de estado por inspección. |
+| **`reports/`** | `SectorComplianceChart`, `AssetTypeComplianceChart`, `SeverityPieChart` | Gráficos analíticos (Recharts) del centro de reportes. |
 | **`layout/`** | `Header`, `Sidebar`, `Layout` | Estructura de navegación responsiva. |
 
 ### Hooks y Contexto
@@ -476,8 +493,10 @@ flowchart LR
 | `alembic` | `>=1.13.1` | Migraciones de esquema relacional. |
 | `psycopg2-binary` | `>=2.9.9` | Driver PostgreSQL para Alembic. |
 | `boto3` | `>=1.34.0` | SDK AWS para S3/MinIO. |
+| `reportlab` | `>=4.0.0` | Generación de actas e informes PDF. |
+| `openpyxl` | `>=3.1.0` | Exportación multi-hoja a Excel (.xlsx). |
 | `python-multipart` | `>=0.0.9` | Procesamiento de uploads multipart. |
-| `pytest` + `pytest-asyncio` + `httpx` | — | Suite de tests (13 tests, 100% passing). |
+| `pytest` + `pytest-asyncio` + `httpx` | — | Suite de tests (20 tests, 100% passing). |
 
 ### Frontend
 | Dependencia | Versión | Propósito |
@@ -487,6 +506,7 @@ flowchart LR
 | `react-router-dom` | `^7.18.3` | Enrutamiento SPA. |
 | `axios` | `^1.20.0` | Cliente HTTP (timeout 15s, interceptor de errores). |
 | `lucide-react` | `^1.46.0` | Iconografía médica y técnica. |
+| `recharts` | `^3.10.1` | Gráficos analíticos del centro de reportes. |
 | `clsx` + `tailwind-merge` | — | Utilidades de clases CSS condicionales. |
 | `@radix-ui/react-dialog` | `^1.1.23` | Modales accesibles. |
 | `@radix-ui/react-select` | `^2.3.7` | Selectores accesibles. |
@@ -509,8 +529,9 @@ flowchart LR
 | `test_compliance.py` | ComplianceEngine (booleanos, numéricos, warning bands), clasificación severidad, catálogo normativas, AuditLog | OE-2 |
 | `test_evidence_and_history.py` | Validación MIME, límite tamaño, inmutabilidad, historial cronológico | OE-3 |
 | `test_objective_3.py` | Upload/validación de evidencia, timeline de activo, reglas de eliminación | OE-3 |
+| `test_objective_4.py` | Acta PDF/Excel de inspección (magic bytes, headers, 404), historial de activo en PDF, informe ejecutivo PDF/XLSX/JSON | OE-4 |
 
-**Resultado actual:** `13/13 tests passing` ✅
+**Resultado actual:** `20/20 tests passing` ✅
 
 ---
 
