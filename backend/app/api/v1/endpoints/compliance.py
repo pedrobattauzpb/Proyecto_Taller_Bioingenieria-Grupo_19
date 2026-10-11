@@ -1,4 +1,4 @@
-﻿from typing import List, Optional
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -41,6 +41,11 @@ async def get_inspection_compliance(
         record_audit_log=recalculate,
         actor="API_COMPLIANCE_SERVICE"
     )
+
+    # Hook no bloqueante para emisión de alertas (OE-5)
+    from app.services.notifications.hooks import on_compliance_evaluated
+    await on_compliance_evaluated(db, inspection, summary)
+
     return summary
 
 

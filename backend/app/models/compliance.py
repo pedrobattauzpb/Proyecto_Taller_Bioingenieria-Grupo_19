@@ -1,4 +1,4 @@
-﻿import enum
+import enum
 from datetime import datetime
 from sqlalchemy import (
     Column,
@@ -37,6 +37,12 @@ class AuditEventType(str, enum.Enum):
     NORM_UPDATE = "NORM_UPDATE"
     TEMPLATE_VERSION_CHANGE = "TEMPLATE_VERSION_CHANGE"
     INSPECTION_COMPLETED = "INSPECTION_COMPLETED"
+    ALERT_RAISED = "ALERT_RAISED"
+    ALERT_ACKNOWLEDGED = "ALERT_ACKNOWLEDGED"
+    ALERT_RESOLVED = "ALERT_RESOLVED"
+    ALERT_ESCALATED = "ALERT_ESCALATED"
+    ALERT_SILENCED = "ALERT_SILENCED"
+
 
 
 class NormativeReference(Base):

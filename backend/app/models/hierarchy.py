@@ -54,6 +54,8 @@ class Asset(Base):
     serial_number = Column(String(100), nullable=True, index=True)
     installation_date = Column(Date, nullable=True)
     qr_code = Column(String(255), unique=True, index=True, nullable=True)
+    hydraulic_test_date = Column(Date, nullable=True)
+    inspection_interval_days = Column(Integer, nullable=True)
 
     # Relaciones
     sector = relationship("Sector", back_populates="assets")

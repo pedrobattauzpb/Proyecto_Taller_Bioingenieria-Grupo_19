@@ -33,15 +33,21 @@ import { NormativeStatusIndicator } from '../components/checklist/NormativeStatu
 import { EvidenceThumbnail } from '../components/checklist/EvidenceThumbnail';
 import { MediaUploader } from '../components/checklist/MediaUploader';
 import { ComponentHistoryTimeline } from '../components/history/ComponentHistoryTimeline';
+import { useAlerts } from '../context/AlertsContext';
+import { AlertSeverityBadge } from '../components/alerts/AlertSeverityBadge';
+import type { Alert } from '../services/types';
+import { Bell } from 'lucide-react';
 
 export const InspectionPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const inspectionId = parseInt(id || '0', 10);
+  const { onAlertEvent } = useAlerts();
 
   const [inspection, setInspection] = useState<InspectionDetail | null>(null);
   const [responsesMap, setResponsesMap] = useState<Record<number, Partial<InspectionResponse>>>({});
   const [evidences, setEvidences] = useState<InspectionEvidence[]>([]);
+  const [activeInspectionAlerts, setActiveInspectionAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,13 +97,22 @@ export const InspectionPage: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (inspectionId > 0) {
-      loadInspection();
+  const loadInspectionAlerts = useCallback(async () => {
+    if (inspectionId <= 0) return;
+    try {
+      const res = await apiService.getAlerts({
+        inspection_id: inspectionId,
+        status: 'OPEN,ACKNOWLEDGED',
+        include_provisional: true,
+        limit: 20,
+      });
+      setActiveInspectionAlerts(res.items);
+    } catch (err) {
+      console.warn('No se pudieron cargar alertas de la inspección:', err);
     }
   }, [inspectionId]);
 
-  const loadInspection = async () => {
+  const loadInspection = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -110,13 +125,36 @@ export const InspectionPage: React.FC = () => {
         map[r.item_id] = { ...r };
       });
       setResponsesMap(map);
+      loadInspectionAlerts();
     } catch (err: any) {
       console.error('Error cargando inspección:', err);
       setError('No se pudo cargar el detalle de la inspección. Verifique la conexión con el servidor.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [inspectionId, loadInspectionAlerts]);
+
+  useEffect(() => {
+    if (inspectionId > 0) {
+      loadInspection();
+      loadInspectionAlerts();
+    }
+  }, [inspectionId, loadInspection, loadInspectionAlerts]);
+
+  // Refrescar ante eventos SSE asociados a esta inspección
+  useEffect(() => {
+    const unsub = onAlertEvent((ev) => {
+      const targetInspectionId =
+        ev.data?.inspection_id || ev.data?.alert?.inspection_id;
+      if (targetInspectionId === inspectionId) {
+        loadInspectionAlerts();
+        apiService.getInspection(inspectionId).then((data) => {
+          setInspection(data);
+        }).catch(() => {});
+      }
+    });
+    return unsub;
+  }, [onAlertEvent, inspectionId, loadInspectionAlerts]);
 
   const handleUploadEvidence = (newEvidence: InspectionEvidence) => {
     setEvidences((prev) => [newEvidence, ...prev]);
@@ -432,6 +470,42 @@ export const InspectionPage: React.FC = () => {
         warningCount={complianceEvaluation.warningCount}
       />
 
+      {/* Alertas Activas en esta Inspección (OE-5) */}
+      {activeInspectionAlerts.length > 0 && (
+        <div className="flex flex-col gap-2.5 p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[var(--ink)] flex items-center gap-1.5">
+              <Bell className="w-3.5 h-3.5 text-[var(--accent)]" />
+              <span>Desvíos y Alertas Activas ({activeInspectionAlerts.length})</span>
+            </span>
+            <span className="text-[10.5px] font-medium text-[var(--ink-faint)]">
+              {isCompleted ? 'Consolidadas' : 'Provisionales (se consolidan al cerrar)'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {activeInspectionAlerts.map((alt) => (
+              <div
+                key={alt.id}
+                onClick={() => navigate(`/alerts?id=${alt.id}`)}
+                className="p-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] flex flex-col gap-1 cursor-pointer hover:border-[var(--accent)] transition-all"
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <AlertSeverityBadge severity={alt.severity} size="sm" />
+                  {alt.is_provisional && (
+                    <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 dark:bg-blue-950 dark:text-blue-300 px-1.5 py-0.2 rounded border border-blue-200 dark:border-blue-800">
+                      Provisional
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs font-bold text-[var(--ink)] line-clamp-1">{alt.title}</span>
+                <span className="text-[11px] text-[var(--ink-soft)] font-mono">{alt.normative_ref || alt.rule_code}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Lista de Ítems del Checklist */}
       <div className="flex flex-col gap-3">
         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -560,6 +634,17 @@ export const InspectionPage: React.FC = () => {
                   Todos los ítems obligatorios han sido respondidos. Al confirmar, la inspección cambiará a estado{' '}
                   <strong className="text-emerald-700">COMPLETADA</strong> y quedará sellada para auditoría inmutable.
                 </p>
+
+                {activeInspectionAlerts.length > 0 && (
+                  <div className="p-3 bg-[var(--warn-soft)] border border-[var(--warn)]/30 rounded-xl text-xs text-[var(--warn)] flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-[var(--warn)]" />
+                    <span className="leading-relaxed">
+                      <strong>Aviso de notificación:</strong> Al sellar esta inspección se consolidarán y
+                      despacharán <strong>{activeInspectionAlerts.length}</strong> alerta(s) de desvío técnico a
+                      los canales externos activos (Jefatura de Ingeniería Clínica, correo institucional y webhooks).
+                    </span>
+                  </div>
+                )}
 
                 <Input
                   label="Observaciones Finales / Notas de Cierre"

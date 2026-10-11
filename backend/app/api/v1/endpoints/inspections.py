@@ -434,6 +434,11 @@ async def complete_inspection(
     db.add(completion_audit_log)
 
     await db.commit()
+
+    # Hook no bloqueante para consolidar alertas y dictamen final (OE-5)
+    from app.services.notifications.hooks import on_inspection_completed
+    await on_inspection_completed(db, inspection, final_compliance)
+
     return await get_inspection_detail_internal(id, db, include_compliance=True)
 
 

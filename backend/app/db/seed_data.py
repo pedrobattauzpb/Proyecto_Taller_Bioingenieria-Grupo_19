@@ -1,10 +1,13 @@
 import asyncio
 from sqlalchemy import select
-from datetime import date
+from datetime import date, timedelta
 from app.core.database import AsyncSessionLocal
 from app.models.hierarchy import Hospital, Sector, Asset, AssetType
 from app.models.checklist import ChecklistTemplate, ChecklistItem, ItemType
 from app.models.compliance import NormativeReference, NormativeVersion
+from app.models.notification import AlertRule, NotificationChannel, ChannelType, AlertSeverity
+from app.services.notifications.rules import DEFAULT_RULES
+from app.services.notifications.scheduler import run_scheduled_checks
 
 
 async def seed_normative_catalog(db):
@@ -110,16 +113,66 @@ async def seed_normative_catalog(db):
     db.add(iso_old_v1)
 
 
+async def seed_alert_rules_and_channels(db):
+    """Siembra catálogo de reglas de alertas y canales por defecto si no existen"""
+    for rule_code, rdef in DEFAULT_RULES.items():
+        stmt = select(AlertRule).where(AlertRule.rule_code == rule_code)
+        res = await db.execute(stmt)
+        if not res.scalars().first():
+            rule = AlertRule(
+                rule_code=rule_code,
+                name=rdef.name,
+                description=rdef.description,
+                is_enabled=True,
+                severity_override=None,
+                params=rdef.params,
+                notify_external=rdef.notify_external,
+                escalate_after_minutes=rdef.escalate_after_minutes,
+            )
+            db.add(rule)
+
+    # Canales por defecto
+    chan_stmt = select(NotificationChannel)
+    chan_res = await db.execute(chan_stmt)
+    if not chan_res.scalars().first():
+        in_app_chan = NotificationChannel(
+            name="Notificaciones In-App del Sistema",
+            channel_type=ChannelType.IN_APP,
+            target="*",
+            min_severity=AlertSeverity.INFO,
+            is_active=True,
+        )
+        email_chan = NotificationChannel(
+            name="Jefatura Ingeniería Clínica",
+            channel_type=ChannelType.EMAIL,
+            target="ingenieria.clinica@hospital.local",
+            min_severity=AlertSeverity.HIGH,
+            is_active=False,
+        )
+        webhook_chan = NotificationChannel(
+            name="Webhook Integración Externa",
+            channel_type=ChannelType.WEBHOOK,
+            target="http://localhost:9999/webhook",
+            min_severity=AlertSeverity.MEDIUM,
+            is_active=False,
+        )
+        db.add_all([in_app_chan, email_chan, webhook_chan])
+
+    await db.flush()
+
+
 async def seed_database():
     async with AsyncSessionLocal() as db:
         # Sembrar catálogo normativo siempre si no existe
         await seed_normative_catalog(db)
+        # Sembrar catálogo de reglas y canales de alertas
+        await seed_alert_rules_and_channels(db)
 
         # Verificar si ya existen hospitales
         check_hospital = await db.execute(select(Hospital))
         if check_hospital.scalars().first():
             await db.commit()
-            print("INFO: La base de datos ya contiene registros clínicos. Catálogo normativo verificado.")
+            print("INFO: La base de datos ya contiene registros clínicos. Catálogo normativo y reglas verificados.")
             return
 
 
@@ -222,6 +275,7 @@ async def seed_database():
                 tag_code="CIL-O2-B01",
                 name="Cilindro O2 Reserva 50L (Rampa Auxiliar Manifold)",
                 asset_type=AssetType.GAS_CYLINDER,
+                hydraulic_test_date=date.today() - timedelta(days=730),
                 is_active=True
             ),
             Asset(
@@ -229,6 +283,7 @@ async def seed_database():
                 tag_code="CIL-O2-PORT-01",
                 name="Tubo O2 Portátil 10L - Traslado UTI/Guardia",
                 asset_type=AssetType.GAS_CYLINDER,
+                hydraulic_test_date=date.today() - timedelta(days=2200),
                 is_active=True
             ),
             Asset(
@@ -236,6 +291,7 @@ async def seed_database():
                 tag_code="CIL-N2O-B01",
                 name="Cilindro N2O 50L - Rampa Manifold Quirúrgico",
                 asset_type=AssetType.GAS_CYLINDER,
+                hydraulic_test_date=date.today() - timedelta(days=1800),
                 is_active=True
             ),
         ]
@@ -249,7 +305,8 @@ async def seed_database():
             asset_type=AssetType.MANIFOLD,
             version="1.0",
             description="Protocolo técnico para manifolds de suministro centralizado conforme a ISO 7396-1:cl.5/6.",
-            is_active=True
+            is_active=True,
+            default_interval_days=30
         )
         db.add(tmpl_manifold)
         await db.flush()
@@ -317,7 +374,8 @@ async def seed_database():
             asset_type=AssetType.AVSU_VALVE,
             version="1.0",
             description="Evaluación de módulos AVSU de sectorización y emergencia bajo norma ISO 7396-1:cl.8.",
-            is_active=True
+            is_active=True,
+            default_interval_days=90
         )
         db.add(tmpl_avsu)
         await db.flush()
@@ -375,7 +433,8 @@ async def seed_database():
             asset_type=AssetType.TERMINAL_UNIT,
             version="1.0",
             description="Verificación de tomas de pared y columnas de gases conforme a ISO 7396-1:cl.11.",
-            is_active=True
+            is_active=True,
+            default_interval_days=180
         )
         db.add(tmpl_tu)
         await db.flush()
@@ -433,7 +492,8 @@ async def seed_database():
             asset_type=AssetType.PRESSURE_REGULATOR,
             version="1.0",
             description="Control de etapas reductoras y de alivio conforme a ISO 7396-1:cl.7.",
-            is_active=True
+            is_active=True,
+            default_interval_days=90
         )
         db.add(tmpl_reg)
         await db.flush()
@@ -494,7 +554,8 @@ async def seed_database():
             asset_type=AssetType.GAS_CYLINDER,
             version="1.0",
             description="Protocolo de inspección de envases a presión según Resolución MSAL 1130/2000 sección 1.2.2.",
-            is_active=True
+            is_active=True,
+            default_interval_days=30
         )
         db.add(tmpl_cyl)
         await db.flush()
@@ -565,9 +626,14 @@ async def seed_database():
             ),
         ]
         db.add_all(items_cyl)
+        await db.flush()
+
+        # Ejecutar barrido inicial de alertas programadas
+        print("INFO: Ejecutando barrido inicial de alertas programadas...")
+        await run_scheduled_checks(db)
 
         await db.commit()
-        print("INFO: Seed completado exitosamente con 1 Hospital, 4 Sectores, 11 Activos y 5 Plantillas normativas.")
+        print("INFO: Seed completado exitosamente con 1 Hospital, 4 Sectores, 11 Activos, 5 Plantillas y alertas iniciales.")
 
 
 if __name__ == "__main__":

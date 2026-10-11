@@ -1,8 +1,18 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ClipboardList, Info, Sun, Moon, FileBarChart2 } from 'lucide-react';
+import {
+  LayoutDashboard,
+  ClipboardList,
+  Info,
+  Sun,
+  Moon,
+  FileBarChart2,
+  Bell,
+  BellRing,
+} from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useTheme } from '../../context/ThemeContext';
+import { useAlerts } from '../../context/AlertsContext';
 
 interface SidebarProps {
   className?: string;
@@ -11,6 +21,10 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
   const { theme, toggleTheme } = useTheme();
+  const { summary, unreadCount } = useAlerts();
+
+  const alertBadgeCount = unreadCount > 0 ? unreadCount : summary?.open_total || 0;
+  const isCritical = (summary?.unacknowledged_critical ?? 0) > 0;
 
   const navItems = [
     {
@@ -27,6 +41,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
       label: 'Reportes y Auditoría',
       path: '/reports',
       icon: FileBarChart2,
+    },
+    {
+      label: 'Centro de Alertas',
+      path: '/alerts',
+      icon: Bell,
+      badge: alertBadgeCount,
+      badgeCritical: isCritical,
+    },
+    {
+      label: 'Notificaciones',
+      path: '/settings/notifications',
+      icon: BellRing,
     },
   ];
 
@@ -52,7 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
               onClick={onItemClick}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-2.5 py-2 px-3 rounded-lg text-sm transition-all cursor-pointer no-underline',
+                  'flex items-center justify-between py-2 px-3 rounded-lg text-sm transition-all cursor-pointer no-underline',
                   isActive
                     ? 'bg-[var(--accent-soft)] text-[var(--accent-strong)] font-semibold'
                     : 'text-[var(--ink-soft)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)] font-medium'
@@ -61,8 +87,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
             >
               {({ isActive }) => (
                 <>
-                  <Icon className={cn('w-4 h-4 shrink-0', isActive ? 'text-[var(--accent-strong)]' : 'text-[var(--ink-faint)]')} />
-                  <span>{item.label}</span>
+                  <div className="flex items-center gap-2.5">
+                    <Icon className={cn('w-4 h-4 shrink-0', isActive ? 'text-[var(--accent-strong)]' : 'text-[var(--ink-faint)]')} />
+                    <span>{item.label}</span>
+                  </div>
+
+                  {item.badge && item.badge > 0 ? (
+                    <span
+                      className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded-full text-white ${
+                        item.badgeCritical ? 'bg-[var(--danger)] animate-pulse' : 'bg-[var(--warn)]'
+                      }`}
+                    >
+                      {item.badge}
+                    </span>
+                  ) : null}
                 </>
               )}
             </NavLink>

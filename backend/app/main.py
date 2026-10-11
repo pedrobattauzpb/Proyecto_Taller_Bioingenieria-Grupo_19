@@ -5,6 +5,7 @@ from app.core.config import settings
 from app.core.database import async_engine, Base
 from app.api.v1.api import api_router
 from app.db.init_db import init_db_data
+from app.services.notifications import alert_scheduler
 
 
 @asynccontextmanager
@@ -15,7 +16,16 @@ async def lifespan(app: FastAPI):
 
     # Cargar datos semilla si la base está vacía
     await init_db_data()
-    yield
+
+    if settings.ALERTS_SCHEDULER_ENABLED:
+        await alert_scheduler.start()
+
+    try:
+        yield
+    finally:
+        if settings.ALERTS_SCHEDULER_ENABLED:
+            await alert_scheduler.stop()
+
 
 
 app = FastAPI(

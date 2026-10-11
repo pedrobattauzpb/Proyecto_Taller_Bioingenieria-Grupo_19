@@ -50,6 +50,32 @@ class Settings(BaseSettings):
         "video/quicktime",
     ]
 
+    # OE-5: Notificaciones y Alertas
+    ALERTS_ENABLED: bool = True
+    ALERTS_SCHEDULER_ENABLED: bool = True
+    ALERTS_SCHEDULER_INTERVAL_SECONDS: int = 300
+    ALERTS_DISPATCH_SYNC: bool = False  # True en tests
+    ALERTS_NOTIFY_CRITICAL_LIVE: bool = True
+    ALERTS_DEFAULT_INSPECTION_INTERVAL_DAYS: int = 90
+    ALERTS_DUE_SOON_DAYS: int = 7
+    ALERTS_STALE_INSPECTION_HOURS: int = 48
+    ALERTS_HYDRO_TEST_VALIDITY_YEARS: int = 5
+    ALERTS_HYDRO_TEST_WARN_DAYS: int = 60
+    ALERTS_RECURRENT_FAIL_THRESHOLD: int = 3
+    ALERTS_RECURRENT_FAIL_WINDOW: int = 5
+    ALERTS_MAX_SILENCE_HOURS: int = 72
+    ALERTS_MAX_EXTERNAL_PER_HOUR: int = 30
+    ALERTS_DIGEST_ENABLED: bool = False
+    ALERTS_DIGEST_INTERVAL_MINUTES: int = 60
+    FRONTEND_BASE_URL: str = "http://localhost:5173"
+
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_USE_TLS: bool = True
+    SMTP_FROM: str = "GMAO Gases Medicinales <no-reply@hospital.local>"
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:

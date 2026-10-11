@@ -1,5 +1,16 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import hierarchy, checklists, inspections, stats, compliance, normatives, evidence, reports
+from app.api.v1.endpoints import (
+    hierarchy,
+    checklists,
+    inspections,
+    stats,
+    compliance,
+    normatives,
+    evidence,
+    reports,
+    alerts,
+    notifications,
+)
 
 api_router = APIRouter()
 
@@ -11,5 +22,6 @@ api_router.include_router(normatives.router, prefix="/normatives", tags=["Catál
 api_router.include_router(stats.router, prefix="", tags=["Métricas e Historial"])
 api_router.include_router(evidence.router, prefix="/evidence", tags=["Evidencia Multimedia"])
 api_router.include_router(reports.router, prefix="", tags=["Reportes Técnicos y Normativos"])
-
-
+api_router.include_router(alerts.router, prefix="/alerts", tags=["Alertas y Notificaciones"])
+api_router.include_router(alerts.asset_router, prefix="/assets", tags=["Alertas y Notificaciones"])
+api_router.include_router(notifications.router, prefix="/notifications", tags=["Configuración de Notificaciones"])

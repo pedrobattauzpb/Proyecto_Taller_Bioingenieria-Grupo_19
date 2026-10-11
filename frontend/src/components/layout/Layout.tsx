@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { AlertToastStack } from '../alerts/AlertToastStack';
 import { X } from 'lucide-react';
 
 export const Layout: React.FC = () => {
@@ -10,6 +11,7 @@ export const Layout: React.FC = () => {
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[var(--bg)] text-[var(--ink)] transition-colors">
       <Header onToggleSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)} />
+      <AlertToastStack />
 
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
         {/* Desktop Sidebar */}

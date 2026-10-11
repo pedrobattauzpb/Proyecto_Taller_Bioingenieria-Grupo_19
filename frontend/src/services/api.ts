@@ -16,6 +16,16 @@ import type {
   AuditLogEntry,
   InspectionEvidence,
   ExecutiveReportData,
+  Alert,
+  AlertDetail,
+  AlertListResponse,
+  AlertSummary,
+  NotificationChannel,
+  AlertRule,
+  NotificationDelivery,
+  AlertSeverity,
+  ChannelType,
+  DeliveryStatus,
 } from './types';
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
@@ -242,5 +252,167 @@ export const apiService = {
       params,
     });
     return response.data;
+  },
+
+  // --- Subsistema de Notificaciones y Alertas (Objetivo Específico 5) ---
+
+  async getAlerts(params?: {
+    status?: string | string[];
+    severity?: string | string[];
+    rule_code?: string;
+    hospital_id?: number;
+    sector_id?: number;
+    asset_id?: number;
+    inspection_id?: number;
+    include_provisional?: boolean;
+    q?: string;
+    limit?: number;
+    offset?: number;
+    sort?: string;
+  }): Promise<AlertListResponse> {
+    const response = await apiClient.get<AlertListResponse>('/alerts', { params });
+    return response.data;
+  },
+
+  async getAlertSummary(hospitalId?: number, withMetrics: boolean = false): Promise<AlertSummary> {
+    const params: Record<string, any> = {};
+    if (hospitalId !== undefined && hospitalId !== null) params.hospital_id = hospitalId;
+    if (withMetrics) params.with_metrics = true;
+    const response = await apiClient.get<AlertSummary>('/alerts/summary', { params });
+    return response.data;
+  },
+
+  async getAlert(id: number): Promise<AlertDetail> {
+    const response = await apiClient.get<AlertDetail>(`/alerts/${id}`);
+    return response.data;
+  },
+
+  async acknowledgeAlert(id: number, body: { actor: string; note?: string }): Promise<Alert> {
+    const response = await apiClient.post<Alert>(`/alerts/${id}/acknowledge`, body);
+    return response.data;
+  },
+
+  async resolveAlert(id: number, body: { actor: string; note: string }): Promise<Alert> {
+    const response = await apiClient.post<Alert>(`/alerts/${id}/resolve`, body);
+    return response.data;
+  },
+
+  async silenceAlert(
+    id: number,
+    body: { actor: string; until: string; note?: string }
+  ): Promise<Alert> {
+    const response = await apiClient.post<Alert>(`/alerts/${id}/silence`, body);
+    return response.data;
+  },
+
+  async bulkAcknowledgeAlerts(ids: number[], actor: string): Promise<{ updated: number }> {
+    const response = await apiClient.post<{ updated: number }>('/alerts/bulk-acknowledge', {
+      ids,
+      actor,
+    });
+    return response.data;
+  },
+
+  async runAlertChecks(): Promise<Record<string, number>> {
+    const response = await apiClient.post<Record<string, number>>('/alerts/run-checks');
+    return response.data;
+  },
+
+  async getAssetAlerts(assetId: number, status?: string): Promise<Alert[]> {
+    const params = status ? { status } : {};
+    const response = await apiClient.get<Alert[]>(`/assets/${assetId}/alerts`, { params });
+    return response.data;
+  },
+
+  async getChannels(): Promise<NotificationChannel[]> {
+    const response = await apiClient.get<NotificationChannel[]>('/notifications/channels');
+    return response.data;
+  },
+
+  async createChannel(data: {
+    name: string;
+    channel_type: ChannelType;
+    target: string;
+    min_severity: AlertSeverity;
+    hospital_id?: number | null;
+    sector_id?: number | null;
+    is_active?: boolean;
+    secret?: string;
+  }): Promise<NotificationChannel> {
+    const response = await apiClient.post<NotificationChannel>('/notifications/channels', data);
+    return response.data;
+  },
+
+  async updateChannel(
+    id: number,
+    data: Partial<{
+      name: string;
+      channel_type: ChannelType;
+      target: string;
+      min_severity: AlertSeverity;
+      hospital_id?: number | null;
+      sector_id?: number | null;
+      is_active?: boolean;
+      secret?: string;
+    }>
+  ): Promise<NotificationChannel> {
+    const response = await apiClient.put<NotificationChannel>(`/notifications/channels/${id}`, data);
+    return response.data;
+  },
+
+  async deleteChannel(id: number): Promise<{ success: boolean; id: number }> {
+    const response = await apiClient.delete<{ success: boolean; id: number }>(
+      `/notifications/channels/${id}`
+    );
+    return response.data;
+  },
+
+  async testChannel(id: number): Promise<NotificationDelivery> {
+    const response = await apiClient.post<NotificationDelivery>(
+      `/notifications/channels/${id}/test`
+    );
+    return response.data;
+  },
+
+  async getAlertRules(): Promise<AlertRule[]> {
+    const response = await apiClient.get<AlertRule[]>('/notifications/rules');
+    return response.data;
+  },
+
+  async updateAlertRule(
+    ruleCode: string,
+    data: Partial<{
+      is_enabled: boolean;
+      severity_override?: AlertSeverity | null;
+      params?: Record<string, any>;
+      notify_external?: boolean;
+      escalate_after_minutes?: number | null;
+    }>
+  ): Promise<AlertRule> {
+    const response = await apiClient.put<AlertRule>(`/notifications/rules/${ruleCode}`, data);
+    return response.data;
+  },
+
+  async getDeliveries(params?: {
+    alert_id?: number;
+    status?: DeliveryStatus;
+    channel_type?: ChannelType;
+    limit?: number;
+    offset?: number;
+  }): Promise<NotificationDelivery[]> {
+    const response = await apiClient.get<NotificationDelivery[]>('/notifications/deliveries', {
+      params,
+    });
+    return response.data;
+  },
+
+  alertStreamUrl(hospitalId?: number): string {
+    const base = API_BASE_URL.startsWith('http')
+      ? `${API_BASE_URL}/alerts/stream`
+      : `${window.location.origin}${API_BASE_URL.startsWith('/') ? API_BASE_URL : '/' + API_BASE_URL}/alerts/stream`;
+    if (hospitalId) {
+      return `${base}?hospital_id=${hospitalId}`;
+    }
+    return base;
   },
 };

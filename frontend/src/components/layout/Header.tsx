@@ -1,6 +1,8 @@
 import React from 'react';
 import { Activity, Menu } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { AlertBell } from '../alerts/AlertBell';
+import { NetworkHealthIndicator } from '../alerts/NetworkHealthIndicator';
 
 interface HeaderProps {
   hospitalName?: string;
@@ -39,7 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
         </Link>
       </div>
 
-      {/* Badges de Normativas y Estado Clínico */}
+      {/* Badges de Normativas, Estado Clínico y Campanita */}
       <div className="flex items-center gap-2">
         <div className="hidden sm:flex items-center gap-2">
           <span className="text-[11.5px] font-semibold py-1 px-2.5 rounded-full bg-[var(--surface-2)] text-[var(--ink-soft)] border border-[var(--border)]">
@@ -50,9 +52,10 @@ export const Header: React.FC<HeaderProps> = ({
           </span>
         </div>
 
-        <div className="inline-flex items-center gap-1.5 bg-[var(--ok-soft)] text-[var(--ok)] py-1 px-2.5 rounded-full text-xs font-bold select-none">
-          <span className="w-2 h-2 rounded-full bg-[var(--ok)] animate-pulse" />
-          <span>Red Operativa</span>
+        <NetworkHealthIndicator />
+
+        <div className="border-l border-[var(--border)] pl-1.5 ml-0.5">
+          <AlertBell />
         </div>
       </div>
     </header>

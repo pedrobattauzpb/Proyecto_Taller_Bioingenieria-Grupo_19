@@ -43,6 +43,7 @@ Su objetivo principal es digitalizar, estandarizar y auditar de forma integral l
 | **OE-2** | Motor de cumplimiento normativo en tiempo real (`ComplianceEngine`), catálogo de normas vigentes, alertas de severidad y bitácora de auditoría inmutable | ✅ Completado |
 | **OE-3** | Base de datos centralizada con historial detallado de inspección por componente y soporte de evidencia multimedia (fotos/videos) | ✅ Completado |
 | **OE-4** | Motor de reportes que genere informes estructurados automáticos sobre el estado de la infraestructura respecto a las normativas | ✅ Completado |
+| **OE-5** | Sistema de notificaciones capaz de emitir alertas frente a la detección de fallas o incumplimientos de la normativa (en vivo y programadas, multicanal In-App/SSE/Email/Webhook) | ✅ Completado |
 
 ---
 
@@ -81,12 +82,13 @@ Proyecto_Taller_Bioingenieria-Grupo_19/
 │   │           ├── pdf_generator.py   #   Actas e informes PDF (ReportLab)
 │   │           ├── excel_generator.py #   Libros Excel multi-hoja (openpyxl)
 │   │           └── styles.py          #   Paleta y estilos tipográficos institucionales
-│   ├── tests/                   # 20 tests (pytest-asyncio + httpx):
+│   ├── tests/                   # 42 tests (pytest-asyncio + httpx):
 │   │   ├── test_api.py          #   Liveness, jerarquía, plantillas, ciclo de inspección
 │   │   ├── test_compliance.py   #   ComplianceEngine, severidades, audit logs
 │   │   ├── test_evidence_and_history.py  # MIME validation, historial de activo
 │   │   ├── test_objective_3.py  #   Evidence upload, inmutabilidad, timeline
-│   │   └── test_objective_4.py  #   Actas PDF/Excel, historial PDF, informe ejecutivo
+│   │   ├── test_objective_4.py  #   Actas PDF/Excel, historial PDF, informe ejecutivo
+│   │   └── test_objective_5.py  #   AlertEngine, SSE, deduplicación, multicanal, scheduler
 │   ├── uploads/evidence/        # Almacenamiento local de archivos multimedia
 │   ├── gases_medicinales.db     # Base de datos SQLite de desarrollo
 │   ├── requirements.txt

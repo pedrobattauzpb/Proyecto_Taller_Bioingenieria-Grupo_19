@@ -8,13 +8,15 @@ import {
   User,
   Image as ImageIcon,
   RotateCw,
+  ShieldAlert,
 } from 'lucide-react';
 import { apiService } from '../../services/api';
-import type { InspectionHistoryItem } from '../../services/types';
+import type { InspectionHistoryItem, Alert } from '../../services/types';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { EvidenceThumbnail } from '../checklist/EvidenceThumbnail';
+import { AlertSeverityBadge } from '../alerts/AlertSeverityBadge';
 
 interface ComponentHistoryTimelineProps {
   assetId: number;
@@ -30,6 +32,7 @@ export const ComponentHistoryTimeline: React.FC<ComponentHistoryTimelineProps> =
   onSelectInspection,
 }) => {
   const [history, setHistory] = useState<InspectionHistoryItem[]>([]);
+  const [assetAlerts, setAssetAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,8 +46,20 @@ export const ComponentHistoryTimeline: React.FC<ComponentHistoryTimelineProps> =
     try {
       setLoading(true);
       setError(null);
-      const data = await apiService.getAssetHistory(assetId);
-      setHistory(data);
+      const [histData, alertsData] = await Promise.allSettled([
+        apiService.getAssetHistory(assetId),
+        apiService.getAlerts({ asset_id: assetId, status: 'OPEN,ACKNOWLEDGED', limit: 20 }),
+      ]);
+
+      if (histData.status === 'fulfilled') {
+        setHistory(histData.value);
+      } else {
+        throw histData.reason;
+      }
+
+      if (alertsData.status === 'fulfilled') {
+        setAssetAlerts(alertsData.value.items);
+      }
     } catch (err: any) {
       console.error('Error cargando historial de activo:', err);
       setError('No se pudo cargar el historial del activo.');
@@ -111,6 +126,32 @@ export const ComponentHistoryTimeline: React.FC<ComponentHistoryTimelineProps> =
           <RotateCw className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Alertas vigentes del activo (OE-5) */}
+      {assetAlerts.length > 0 && (
+        <div className="p-3.5 rounded-xl border border-[var(--danger)]/30 bg-[var(--danger-soft)]/20 flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-xs font-bold text-[var(--danger)]">
+            <ShieldAlert className="w-4 h-4" />
+            <span>Alertas y Desvíos Vigentes del Activo ({assetAlerts.length})</span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {assetAlerts.map((alt) => (
+              <div
+                key={alt.id}
+                className="p-2 rounded-lg bg-[var(--surface)] border border-[var(--border)] flex items-center justify-between gap-2 text-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <AlertSeverityBadge severity={alt.severity} size="sm" />
+                  <span className="font-bold text-[var(--ink)]">{alt.title}</span>
+                </div>
+                <span className="font-mono text-[11px] text-[var(--accent)] font-semibold">
+                  {alt.rule_code}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Línea de Tiempo */}
       <div className="flex flex-col gap-6 relative before:absolute before:left-3.5 before:top-4 before:bottom-4 before:w-0.5 before:bg-[var(--border)]">
@@ -183,11 +224,19 @@ export const ComponentHistoryTimeline: React.FC<ComponentHistoryTimelineProps> =
 
                   <div className="flex flex-wrap items-center gap-2">
                     {hasDeviations ? (
-                      <Badge
-                        label={`${item.non_compliant_count} desvío(s) detectado(s)`}
-                        variant="rose"
-                        size="sm"
-                      />
+                      <>
+                        <Badge
+                          label={`${item.non_compliant_count} desvío(s) detectado(s)`}
+                          variant="rose"
+                          size="sm"
+                        />
+                        {isCompleted && (
+                          <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-[var(--danger)] bg-[var(--danger-soft)] px-2 py-0.5 rounded border border-[var(--danger)]/30">
+                            <AlertTriangle className="w-3 h-3" />
+                            Dictamen No Conforme (INS-CLOSED-NC)
+                          </span>
+                        )}
+                      </>
                     ) : isCompleted ? (
                       <Badge label="Cumple Norma 100%" variant="emerald" size="sm" />
                     ) : (

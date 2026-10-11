@@ -7,6 +7,7 @@ import {
   Gauge,
   Layers,
   ShieldCheck,
+  ShieldAlert,
   RotateCw,
   ChevronDown,
   X,
@@ -19,11 +20,16 @@ import {
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { apiService } from '../services/api';
+import { useAlerts } from '../context/AlertsContext';
+import { AlertSeverityBadge } from '../components/alerts/AlertSeverityBadge';
+import { formatRelativeTime } from '../utils/date';
 import type {
   Hospital,
   Asset,
   AssetType,
   StatsOverviewResponse,
+  Alert,
+  AlertSeverity,
 } from '../services/types';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
@@ -53,6 +59,11 @@ export const DashboardPage: React.FC = () => {
   const [selectedHistoryAsset, setSelectedHistoryAsset] = useState<Asset | null>(null);
   const [historyModalOpen, setHistoryModalOpen] = useState<boolean>(false);
 
+  // Alertas integradas en Dashboard (OE-5)
+  const { summary } = useAlerts();
+  const [assetMaxSeverityMap, setAssetMaxSeverityMap] = useState<Record<number, AlertSeverity>>({});
+  const [topAlerts, setTopAlerts] = useState<Alert[]>([]);
+
   useEffect(() => {
     loadDashboardData();
   }, []);
@@ -62,9 +73,10 @@ export const DashboardPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const [hierResult, statsResult] = await Promise.allSettled([
+      const [hierResult, statsResult, alertsResult] = await Promise.allSettled([
         apiService.getHierarchy(),
         apiService.getStats(),
+        apiService.getAlerts({ status: 'OPEN,ACKNOWLEDGED', limit: 500 }),
       ]);
 
       if (hierResult.status === 'fulfilled') {
@@ -95,6 +107,30 @@ export const DashboardPage: React.FC = () => {
         setStats(statsResult.value);
       } else {
         console.warn('Estadísticas no disponibles temporalmente:', statsResult.reason);
+      }
+
+      if (alertsResult.status === 'fulfilled') {
+        const items = alertsResult.value.items;
+        setTopAlerts(items.slice(0, 5));
+
+        const sevWeight: Record<AlertSeverity, number> = {
+          CRITICAL: 5,
+          HIGH: 4,
+          MEDIUM: 3,
+          LOW: 2,
+          INFO: 1,
+        };
+
+        const map: Record<number, AlertSeverity> = {};
+        items.forEach((alt) => {
+          if (alt.asset_id) {
+            const current = map[alt.asset_id];
+            if (!current || sevWeight[alt.severity] > sevWeight[current]) {
+              map[alt.asset_id] = alt.severity;
+            }
+          }
+        });
+        setAssetMaxSeverityMap(map);
       }
     } catch (err: any) {
       console.error('Error inesperado en dashboard:', err);
@@ -243,6 +279,26 @@ export const DashboardPage: React.FC = () => {
           <div className="stat-label">Auditorías completas</div>
         </div>
 
+        <div
+          className="stat cursor-pointer hover:bg-[var(--surface-2)] transition-colors"
+          onClick={() => navigate('/alerts')}
+          title="Ver Centro de Alertas"
+        >
+          <div
+            className={cn(
+              'stat-value',
+              (summary?.unacknowledged_critical ?? 0) > 0
+                ? 'text-[var(--danger)] animate-pulse'
+                : (summary?.open_total ?? 0) > 0
+                ? 'warn'
+                : 'ok'
+            )}
+          >
+            {summary?.open_total ?? 0}
+          </div>
+          <div className="stat-label">Alertas abiertas</div>
+        </div>
+
         <div className="stat">
           <div className="stat-value ok">
             {stats?.global_compliance_percentage !== undefined
@@ -325,65 +381,130 @@ export const DashboardPage: React.FC = () => {
             </div>
           ) : (
             <div className="asset-grid">
-              {activeSector.assets.map((asset) => (
-                <div key={asset.id} className="asset-card">
-                  <div className="flex justify-between items-start gap-2">
-                    <span className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-[var(--info)]">
-                      {getAssetIcon(asset.asset_type)}
-                      <span>{getAssetTypeName(asset.asset_type)}</span>
-                    </span>
-                    <span className="text-[10.5px] text-[var(--ink-faint)] font-semibold">
-                      {asset.tag_code}
-                    </span>
-                  </div>
+              {activeSector.assets.map((asset) => {
+                const maxSeverity = assetMaxSeverityMap[asset.id];
+                return (
+                  <div
+                    key={asset.id}
+                    className={cn(
+                      'asset-card transition-all',
+                      maxSeverity === 'CRITICAL' && 'border-[var(--danger)]/50 ring-1 ring-[var(--danger)]/30'
+                    )}
+                  >
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-[var(--info)]">
+                          {getAssetIcon(asset.asset_type)}
+                          <span>{getAssetTypeName(asset.asset_type)}</span>
+                        </span>
+                        {maxSeverity && (
+                          <AlertSeverityBadge severity={maxSeverity} size="sm" showDot={true} />
+                        )}
+                      </div>
+                      <span className="text-[10.5px] text-[var(--ink-faint)] font-semibold">
+                        {asset.tag_code}
+                      </span>
+                    </div>
 
-                  <div className="font-bold text-[13.5px] text-[var(--ink)] leading-snug line-clamp-2">
-                    {asset.name}
-                  </div>
+                    <div className="font-bold text-[13.5px] text-[var(--ink)] leading-snug line-clamp-2">
+                      {asset.name}
+                    </div>
 
-                  <div className="flex justify-between items-center mt-auto pt-2 border-t border-[var(--border)]">
-                    <span
-                      className={cn(
-                        'flex items-center gap-1.5 text-xs font-medium',
-                        asset.is_active ? 'text-[var(--ok)]' : 'text-[var(--ink-faint)]'
-                      )}
-                    >
+                    <div className="flex justify-between items-center mt-auto pt-2 border-t border-[var(--border)]">
                       <span
                         className={cn(
-                          'w-1.5 h-1.5 rounded-full',
-                          asset.is_active ? 'bg-[var(--ok)]' : 'bg-[var(--ink-faint)]'
+                          'flex items-center gap-1.5 text-xs font-medium',
+                          asset.is_active ? 'text-[var(--ok)]' : 'text-[var(--ink-faint)]'
                         )}
-                      />
-                      <span>{asset.is_active ? 'Operativo' : 'Inactivo'}</span>
-                    </span>
+                      >
+                        <span
+                          className={cn(
+                            'w-1.5 h-1.5 rounded-full',
+                            asset.is_active ? 'bg-[var(--ok)]' : 'bg-[var(--ink-faint)]'
+                          )}
+                        />
+                        <span>{asset.is_active ? 'Operativo' : 'Inactivo'}</span>
+                      </span>
 
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenHistoryModal(asset)}
-                        className="text-[11.5px] font-semibold py-1.5 px-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] text-[var(--ink)] hover:bg-[var(--surface-3)] cursor-pointer transition-colors flex items-center gap-1"
-                        title="Ver historial técnico"
-                      >
-                        <Clock className="w-3.5 h-3.5 text-[var(--ink-soft)]" />
-                        <span>Historial</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleStartInspectionModal(asset)}
-                        className="text-[11.5px] font-semibold py-1.5 px-3 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 cursor-pointer transition-opacity"
-                      >
-                        Auditar
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenHistoryModal(asset)}
+                          className="text-[11.5px] font-semibold py-1.5 px-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] text-[var(--ink)] hover:bg-[var(--surface-3)] cursor-pointer transition-colors flex items-center gap-1"
+                          title="Ver historial técnico"
+                        >
+                          <Clock className="w-3.5 h-3.5 text-[var(--ink-soft)]" />
+                          <span>Historial</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStartInspectionModal(asset)}
+                          className="text-[11.5px] font-semibold py-1.5 px-3 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 cursor-pointer transition-opacity"
+                        >
+                          Auditar
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Columna Derecha: Sidebar de Inspecciones Recientes y Marco Normativo */}
+        {/* Columna Derecha: Sidebar de Alertas Recientes, Inspecciones y Marco Normativo */}
         <div className="flex flex-col gap-3.5">
+          {/* Tarjeta de Alertas Recientes (OE-5) */}
+          <div className="side-card">
+            <div className="side-head">
+              <span className="font-bold text-[13px] text-[var(--ink)] flex items-center gap-1.5">
+                <ShieldAlert className="w-4 h-4 text-[var(--accent)]" />
+                <span>Alertas recientes</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => navigate('/alerts')}
+                className="text-[12px] font-semibold text-[var(--accent)] hover:underline cursor-pointer bg-transparent border-0 p-0"
+              >
+                Ver todas
+              </button>
+            </div>
+
+            {topAlerts.length === 0 ? (
+              <div className="p-4 text-center text-xs text-[var(--ink-soft)]">
+                Sin desvíos normativos activos.
+              </div>
+            ) : (
+              <div>
+                {topAlerts.map((alt) => (
+                  <div
+                    key={alt.id}
+                    onClick={() => navigate(`/alerts?id=${alt.id}`)}
+                    className="insp-item cursor-pointer hover:bg-[var(--surface-2)] transition-colors"
+                  >
+                    <div className="flex justify-between items-center text-[11px]">
+                      <AlertSeverityBadge severity={alt.severity} size="sm" />
+                      <span className="text-[10px] text-[var(--ink-faint)]">
+                        {formatRelativeTime(alt.last_detected_at || alt.created_at)}
+                      </span>
+                    </div>
+                    <div className="text-[12px] font-semibold text-[var(--ink)] line-clamp-1 mt-1">
+                      {alt.title}
+                    </div>
+                    <div className="text-[11px] text-[var(--ink-soft)] flex justify-between items-center mt-0.5">
+                      <span className="font-mono font-bold text-[var(--accent)]">
+                        {alt.asset_tag || alt.rule_code}
+                      </span>
+                      <span className="text-[10px] font-semibold text-[var(--ink-faint)]">
+                        {alt.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Tarjeta de Últimas Inspecciones */}
           <div className="side-card">
             <div className="side-head">

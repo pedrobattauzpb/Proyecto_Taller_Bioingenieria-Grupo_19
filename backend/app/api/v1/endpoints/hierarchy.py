@@ -8,7 +8,7 @@ from app.models.hierarchy import Hospital, Sector, Asset
 from app.schemas.hierarchy import (
     HospitalCreate, HospitalRead,
     SectorCreate, SectorRead,
-    AssetCreate, AssetRead,
+    AssetCreate, AssetUpdate, AssetRead,
     HierarchyTreeResponse, HierarchyMetrics
 )
 
@@ -72,3 +72,41 @@ async def create_asset(asset_in: AssetCreate, db: AsyncSession = Depends(get_db)
     await db.commit()
     await db.refresh(asset)
     return asset
+
+
+@router.put("/assets/{id}", response_model=AssetRead, summary="Actualizar activo")
+async def update_asset(id: int, asset_in: AssetUpdate, db: AsyncSession = Depends(get_db)):
+    stmt = select(Asset).where(Asset.id == id)
+    res = await db.execute(stmt)
+    asset = res.scalars().first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Activo no encontrado")
+
+    update_data = asset_in.model_dump(exclude_unset=True)
+    for k, v in update_data.items():
+        setattr(asset, k, v)
+
+    await db.flush()
+
+    if "hydraulic_test_date" in update_data:
+        from datetime import datetime, timezone
+        from app.services.notifications.evaluators import evaluate_cylinder_hydro_tests
+        from app.services.notifications.alert_engine import AlertEngine
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        exp_fps, soon_fps = await evaluate_cylinder_hydro_tests(db, now)
+        await AlertEngine.auto_resolve(
+            db,
+            fingerprints_vivos=exp_fps,
+            scope_filter={"asset_id": asset.id, "rule_code": "CYL-HYDRO-EXPIRED"},
+        )
+        await AlertEngine.auto_resolve(
+            db,
+            fingerprints_vivos=soon_fps,
+            scope_filter={"asset_id": asset.id, "rule_code": "CYL-HYDRO-SOON"},
+        )
+
+    await db.commit()
+    await db.refresh(asset)
+    return asset
+

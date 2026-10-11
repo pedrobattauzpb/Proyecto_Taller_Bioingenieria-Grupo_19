@@ -36,6 +36,8 @@ export interface Asset {
   installation_date?: string | null;
   qr_code?: string | null;
   is_active: boolean;
+  hydraulic_test_date?: string | null;
+  inspection_interval_days?: number | null;
 }
 
 export interface Sector {
@@ -89,6 +91,7 @@ export interface ChecklistTemplate {
   version: string;
   description?: string | null;
   is_active: boolean;
+  default_interval_days?: number | null;
   items: ChecklistItem[];
 }
 
@@ -121,6 +124,7 @@ export interface InspectionDetail {
   completed_items: number;
   progress_percentage: number;
   compliance_summary?: ComplianceSummary | null;
+  active_alerts?: Alert[];
 }
 
 export type ComplianceStatus = 'COMPLIANT' | 'NON_COMPLIANT' | 'WARNING' | 'NOT_EVALUATED';
@@ -130,7 +134,12 @@ export type AuditEventType =
   | 'COMPLIANCE_CHECK'
   | 'NORM_UPDATE'
   | 'TEMPLATE_VERSION_CHANGE'
-  | 'INSPECTION_COMPLETED';
+  | 'INSPECTION_COMPLETED'
+  | 'ALERT_RAISED'
+  | 'ALERT_ACKNOWLEDGED'
+  | 'ALERT_RESOLVED'
+  | 'ALERT_ESCALATED'
+  | 'ALERT_SILENCED';
 
 export interface NormativeVersion {
   id: number;
@@ -212,6 +221,7 @@ export interface ComplianceSummary {
   observation_deviations_count: number;
   normative_currency: NormativeCurrencyReport;
   results: ComplianceResult[];
+  active_alerts?: Alert[];
 }
 
 export interface AuditLogEntry {
@@ -251,6 +261,8 @@ export interface StatsOverviewResponse {
   recent_inspections: InspectionHistoryItem[];
   global_compliance_percentage?: number;
   active_outdated_norms_count?: number;
+  open_alerts?: number;
+  critical_open_alerts?: number;
 }
 
 export interface CreateInspectionPayload {
@@ -317,3 +329,132 @@ export interface ExecutiveReportData {
   severity_distribution: Record<string, number>;
   top_risk_assets: TopRiskAsset[];
 }
+
+// --- Subsistema de Notificaciones y Alertas (Objetivo Específico 5) ---
+
+export type AlertSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
+
+export type AlertStatus = 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED' | 'AUTO_RESOLVED' | 'SILENCED';
+
+export type AlertSource =
+  | 'COMPLIANCE'
+  | 'SCHEDULER'
+  | 'INSPECTION_LIFECYCLE'
+  | 'NORMATIVE'
+  | 'MANUAL';
+
+export type AlertScopeType = 'INSPECTION' | 'ASSET' | 'TEMPLATE' | 'NORMATIVE' | 'SYSTEM';
+
+export type ChannelType = 'IN_APP' | 'EMAIL' | 'WEBHOOK';
+
+export type DeliveryStatus = 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED';
+
+export interface Alert {
+  id: number;
+  fingerprint: string;
+  rule_code: string;
+  source: AlertSource;
+  severity: AlertSeverity;
+  status: AlertStatus;
+  title: string;
+  message: string;
+  normative_ref?: string | null;
+  scope_type: AlertScopeType;
+  hospital_id?: number | null;
+  sector_id?: number | null;
+  asset_id?: number | null;
+  inspection_id?: number | null;
+  item_id?: number | null;
+  template_id?: number | null;
+  expected_value?: string | null;
+  actual_value?: string | null;
+  context?: Record<string, any>;
+  is_provisional: boolean;
+  occurrence_count: number;
+  first_detected_at: string;
+  last_detected_at: string;
+  acknowledged_at?: string | null;
+  acknowledged_by?: string | null;
+  resolved_at?: string | null;
+  resolved_by?: string | null;
+  resolution_note?: string | null;
+  escalation_level: number;
+  last_escalated_at?: string | null;
+  silenced_until?: string | null;
+  created_at: string;
+  updated_at: string;
+  asset_tag?: string | null;
+  asset_name?: string | null;
+  sector_name?: string | null;
+  hospital_code?: string | null;
+  item_code?: string | null;
+  item_title?: string | null;
+}
+
+export interface NotificationDelivery {
+  id: number;
+  alert_id: number;
+  channel_id?: number | null;
+  channel_type: ChannelType;
+  target: string;
+  event: 'RAISED' | 'ESCALATED' | 'RESOLVED' | 'DIGEST' | string;
+  status: DeliveryStatus;
+  attempts: number;
+  error?: string | null;
+  sent_at?: string | null;
+  created_at: string;
+}
+
+export interface AlertDetail extends Alert {
+  deliveries?: NotificationDelivery[];
+  audit_trail?: AuditLogEntry[];
+}
+
+export interface AlertListResponse {
+  items: Alert[];
+  total: number;
+  counts_by_severity: Record<AlertSeverity, number>;
+  counts_by_status: Record<AlertStatus, number>;
+}
+
+export interface AlertSummary {
+  open_total: number;
+  open_by_severity: Record<AlertSeverity, number>;
+  unacknowledged_critical: number;
+  last_alert_at?: string | null;
+  health: 'OK' | 'DEGRADED' | 'CRITICAL';
+  mtta_minutes?: number | null;
+  mttr_minutes?: number | null;
+}
+
+export interface NotificationChannel {
+  id: number;
+  name: string;
+  channel_type: ChannelType;
+  target: string;
+  min_severity: AlertSeverity;
+  hospital_id?: number | null;
+  sector_id?: number | null;
+  is_active: boolean;
+  has_secret: boolean;
+  created_at: string;
+}
+
+export interface AlertRule {
+  id: number;
+  rule_code: string;
+  name: string;
+  description?: string | null;
+  is_enabled: boolean;
+  severity_override?: AlertSeverity | null;
+  effective_severity?: AlertSeverity;
+  params: Record<string, any>;
+  notify_external: boolean;
+  escalate_after_minutes?: number | null;
+}
+
+export interface AlertStreamEvent {
+  event: 'alert.raised' | 'alert.updated' | 'alert.resolved' | 'alert.escalated' | 'summary' | 'ping';
+  data: any;
+}
+

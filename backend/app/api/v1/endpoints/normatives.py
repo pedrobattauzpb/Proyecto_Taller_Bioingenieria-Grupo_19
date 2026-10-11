@@ -1,4 +1,4 @@
-﻿from typing import List, Optional
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -69,6 +69,15 @@ async def update_normative(
 
     for field, val in norm_in.model_dump(exclude_unset=True).items():
         setattr(item, field, val)
+
+    if norm_in.is_current is False:
+        try:
+            from datetime import datetime, timezone
+            from app.services.notifications.evaluators import evaluate_superseded_normatives
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            await evaluate_superseded_normatives(db, now)
+        except Exception:
+            pass
 
     await db.commit()
     await db.refresh(item)

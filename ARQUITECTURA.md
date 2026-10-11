@@ -2,7 +2,7 @@
 
 > **Documento Maestro de Arquitectura y Especificación Técnica (SSOT)**  
 > *Diseñado como referencia integral para desarrolladores, bioingenieros y agentes de Inteligencia Artificial.*  
-> *Última actualización técnica: 29 de Septiembre de 2026 — Objetivos 1, 2, 3 y 4 completados.*
+> *Última actualización técnica: 11 de Octubre de 2026 — Objetivos 1, 2, 3, 4 y 5 completados.*
 
 ---
 
@@ -29,6 +29,7 @@ El proyecto es un **GMAO / CMMS (Gestión de Mantenimiento Asistido por Ordenado
 | **2** | Motor de cumplimiento normativo en tiempo real, catálogo de normas vigentes, alertas de severidad, bitácora inmutable | ✅ Completado |
 | **3** | Historial centralizado por componente con evidencia multimedia (fotos/videos) | ✅ Completado |
 | **4** | Motor de reportes con generación automática de informes estructurados | ✅ Completado |
+| **5** | Sistema de notificaciones capaz de emitir alertas frente a la detección de fallas o incumplimientos de la normativa (en vivo y programadas, multicanal In-App/SSE/Email/Webhook) | ✅ Completado |
 
 ---
 
@@ -530,8 +531,9 @@ flowchart LR
 | `test_evidence_and_history.py` | Validación MIME, límite tamaño, inmutabilidad, historial cronológico | OE-3 |
 | `test_objective_3.py` | Upload/validación de evidencia, timeline de activo, reglas de eliminación | OE-3 |
 | `test_objective_4.py` | Acta PDF/Excel de inspección (magic bytes, headers, 404), historial de activo en PDF, informe ejecutivo PDF/XLSX/JSON | OE-4 |
+| `test_objective_5.py` | Subsistema de alertas y notificaciones: deduplicación SHA-1, SSE, despachador multicanal, escalamiento, reglas programadas | OE-5 |
 
-**Resultado actual:** `20/20 tests passing` ✅
+**Resultado actual:** `42/42 tests passing` ✅
 
 ---
 
@@ -547,9 +549,10 @@ flowchart LR
 | `09e06454a535` | Tablas iniciales: hospitals, sectors, assets, checklist_templates, checklist_items, inspections, inspection_responses. |
 | `95c1f0327ee8` | Tablas de compliance: normative_references, normative_versions, compliance_results, audit_logs. |
 | `f228caf3e508` | Tabla components e inspection_evidences. |
-| `de86fd1fd98b` | **(HEAD)** Unificación de components dentro de assets, limpieza de FKs, uploaded_by como String. |
+| `de86fd1fd98b` | Unificación de components dentro de assets, limpieza de FKs, uploaded_by como String. |
+| `e1a2b3c4d5e6` | **(HEAD)** Tablas de alertas y notificaciones (alerts, notification_channels, alert_rules, notification_deliveries), extensión de AuditEventType y columnas clínicas en assets y templates. |
 
-**13 tablas físicas:** `alembic_version`, `hospitals`, `sectors`, `assets`, `checklist_templates`, `checklist_items`, `inspections`, `inspection_responses`, `inspection_evidences`, `normative_references`, `normative_versions`, `compliance_results`, `audit_logs`.
+**17 tablas físicas:** `alembic_version`, `hospitals`, `sectors`, `assets`, `checklist_templates`, `checklist_items`, `inspections`, `inspection_responses`, `inspection_evidences`, `normative_references`, `normative_versions`, `compliance_results`, `audit_logs`, `alerts`, `notification_channels`, `alert_rules`, `notification_deliveries`.
 
 ---
 

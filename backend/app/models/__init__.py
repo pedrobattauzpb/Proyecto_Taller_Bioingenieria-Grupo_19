@@ -12,6 +12,18 @@ from app.models.compliance import (
     ComplianceResult,
     AuditLog,
 )
+from app.models.notification import (
+    AlertSeverity,
+    AlertStatus,
+    AlertSource,
+    AlertScopeType,
+    ChannelType,
+    DeliveryStatus,
+    Alert,
+    NotificationChannel,
+    AlertRule,
+    NotificationDelivery,
+)
 
 __all__ = [
     "Base",
@@ -34,5 +46,14 @@ __all__ = [
     "NormativeVersion",
     "ComplianceResult",
     "AuditLog",
+    "AlertSeverity",
+    "AlertStatus",
+    "AlertSource",
+    "AlertScopeType",
+    "ChannelType",
+    "DeliveryStatus",
+    "Alert",
+    "NotificationChannel",
+    "AlertRule",
+    "NotificationDelivery",
 ]
-

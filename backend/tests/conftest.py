@@ -1,3 +1,7 @@
+import os
+os.environ.setdefault("ALERTS_SCHEDULER_ENABLED", "False")
+os.environ.setdefault("ALERTS_DISPATCH_SYNC", "True")
+
 import pytest
 import asyncio
 from httpx import AsyncClient, ASGITransport

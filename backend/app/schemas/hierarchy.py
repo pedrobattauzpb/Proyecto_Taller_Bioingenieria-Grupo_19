@@ -1,5 +1,5 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, date
 from pydantic import BaseModel, ConfigDict
 from app.models.hierarchy import AssetType
 
@@ -9,15 +9,35 @@ class AssetBase(BaseModel):
     name: str
     asset_type: AssetType
     is_active: bool = True
+    hydraulic_test_date: Optional[date] = None
+    inspection_interval_days: Optional[int] = None
 
 
 class AssetCreate(AssetBase):
     sector_id: int
+    serial_number: Optional[str] = None
+    installation_date: Optional[date] = None
+    qr_code: Optional[str] = None
+
+
+class AssetUpdate(BaseModel):
+    tag_code: Optional[str] = None
+    name: Optional[str] = None
+    asset_type: Optional[AssetType] = None
+    is_active: Optional[bool] = None
+    hydraulic_test_date: Optional[date] = None
+    inspection_interval_days: Optional[int] = None
+    serial_number: Optional[str] = None
+    installation_date: Optional[date] = None
+    qr_code: Optional[str] = None
 
 
 class AssetRead(AssetBase):
     id: int
     sector_id: int
+    serial_number: Optional[str] = None
+    installation_date: Optional[date] = None
+    qr_code: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
