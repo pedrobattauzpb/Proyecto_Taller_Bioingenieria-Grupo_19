@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">GMOS Gases Medicinales</string>
+    <string name="title_activity_main">GMOS Gases Medicinales</string>
+    <string name="package_name">ar.gob.hospital.gases</string>
+    <string name="custom_url_scheme">ar.gob.hospital.gases</string>
+</resources>
