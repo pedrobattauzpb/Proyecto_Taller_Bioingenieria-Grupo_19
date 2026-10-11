@@ -59,6 +59,49 @@ body,
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
+/* ============================================================
+   BARRAS DE DESPLAZAMIENTO MODERNAS (Sleek Custom Scrollbars)
+   ============================================================ */
+
+/* Estándar CSS W3C (Firefox y navegadores modernos) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+/* Motores WebKit / Chromium (Chrome, Edge, Safari, Electron, Capacitor) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-faint);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Utilidad para ocultar barras de scroll manteniendo el scroll activo */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Componentes del layout reorganizado */
 .stat-strip {
   background: var(--surface);

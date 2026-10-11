@@ -45,7 +45,7 @@ export const Layout: React.FC = () => {
         )}
 
         {/* Contenido Principal */}
-        <main className="flex-1 min-w-0 overflow-y-auto bg-[var(--bg)] p-4 sm:p-6 md:p-8 transition-colors">
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-[var(--bg)] p-4 sm:p-6 md:p-8 transition-colors">
           <div className="max-w-[1280px] mx-auto w-full">
             <Outlet />
           </div>
