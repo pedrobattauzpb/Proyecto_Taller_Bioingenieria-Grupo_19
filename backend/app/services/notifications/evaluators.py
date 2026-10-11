@@ -41,7 +41,7 @@ async def evaluate_asset_overdue_and_due_soon(
     overdue_fps: Set[str] = set()
     due_soon_fps: Set[str] = set()
 
-    stmt = select(Asset).where(Asset.is_active == True)
+    stmt = select(Asset).options(selectinload(Asset.sector)).where(Asset.is_active == True)
     res = await db.execute(stmt)
     assets: List[Asset] = res.scalars().all()
 
@@ -225,10 +225,14 @@ async def evaluate_cylinder_hydro_tests(
     expired_fps: Set[str] = set()
     soon_fps: Set[str] = set()
 
-    stmt = select(Asset).where(
-        Asset.asset_type == AssetType.GAS_CYLINDER,
-        Asset.is_active == True,
-        Asset.hydraulic_test_date != None,
+    stmt = (
+        select(Asset)
+        .options(selectinload(Asset.sector))
+        .where(
+            Asset.asset_type == AssetType.GAS_CYLINDER,
+            Asset.is_active == True,
+            Asset.hydraulic_test_date != None,
+        )
     )
     res = await db.execute(stmt)
     cylinders = res.scalars().all()
@@ -374,7 +378,7 @@ async def evaluate_recurrent_failures(
     threshold = settings.ALERTS_RECURRENT_FAIL_THRESHOLD  # 3
     window = settings.ALERTS_RECURRENT_FAIL_WINDOW        # 5
 
-    stmt = select(Asset).where(Asset.is_active == True)
+    stmt = select(Asset).options(selectinload(Asset.sector)).where(Asset.is_active == True)
     res = await db.execute(stmt)
     assets = res.scalars().all()
 
