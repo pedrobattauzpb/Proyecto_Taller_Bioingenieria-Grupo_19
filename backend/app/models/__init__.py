@@ -1,4 +1,5 @@
 from app.core.database import Base
+from app.models.user import UserRole, User, user_hospitals, RefreshToken
 from app.models.hierarchy import AssetType, Hospital, Sector, Asset
 from app.models.checklist import ItemType, ChecklistTemplate, ChecklistItem
 from app.models.inspection import InspectionStatus, Inspection, InspectionResponse
@@ -27,6 +28,10 @@ from app.models.notification import (
 
 __all__ = [
     "Base",
+    "UserRole",
+    "User",
+    "user_hospitals",
+    "RefreshToken",
     "AssetType",
     "Hospital",
     "Sector",

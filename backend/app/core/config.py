@@ -1,5 +1,5 @@
 from typing import List, Union
-from pydantic import AnyHttpUrl, field_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import json
 import os
@@ -17,13 +17,30 @@ class Settings(BaseSettings):
 
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
-        "http://localhost:8081",
-        "http://localhost:19006",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
         "http://localhost:3000",
-        "http://127.0.0.1:8081",
         "http://127.0.0.1:3000",
-        "*"
+        "http://localhost:8081",
+        "http://127.0.0.1:8081",
+        "capacitor://localhost",
+        "http://localhost",
     ]
+
+    # Security & OE-6
+    SECRET_KEY: str = "dev-insecure-change-me"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    SSE_TICKET_EXPIRE_SECONDS: int = 60
+    FILE_URL_EXPIRE_SECONDS: int = 900
+    AUTH_MAX_FAILED_ATTEMPTS: int = 5
+    AUTH_LOCKOUT_MINUTES: int = 15
+    AUTH_RATE_LIMIT_PER_MINUTE: int = 10
+    PASSWORD_MIN_LENGTH: int = 10
+    FIRST_ADMIN_EMAIL: str = ""
+    FIRST_ADMIN_PASSWORD: str = ""
+    SEED_DEMO_USERS: bool = True
 
     # Object Storage (MinIO / S3 / Local fallback)
     STORAGE_BACKEND: str = "minio"  # "minio" | "s3" | "local"

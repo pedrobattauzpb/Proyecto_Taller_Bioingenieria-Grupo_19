@@ -1,14 +1,50 @@
 ﻿import pytest
-from httpx import AsyncClient, ASGITransport
-from datetime import datetime
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.main import app
-from app.core.database import AsyncSessionLocal
-from app.models.hierarchy import Asset, Hospital, Sector, AssetType
-from app.models.checklist import ChecklistTemplate, ChecklistItem, ItemType
+from app.models.checklist import ChecklistItem, ItemType
 from app.models.compliance import NormativeReference, NormativeVersion, ComplianceStatus, ComplianceSeverity
-from app.models.inspection import Inspection, InspectionStatus
 from app.services.compliance_engine import ComplianceEngine
+
+
+@pytest.fixture
+async def normative_catalog(db_session: AsyncSession):
+    """Catálogo mínimo de ejemplo, aislado en la base temporal del test."""
+    norms = [
+        NormativeReference(
+            code="ISO 7396-1:2016",
+            title="Sistemas de canalización de gases medicinales",
+            issuing_body="ISO",
+            current_version="2016",
+            is_current=True,
+        ),
+        NormativeReference(
+            code="Res1130/2000",
+            title="Reglamento de gases medicinales",
+            issuing_body="Ministerio de Salud",
+            current_version="2000",
+            is_current=True,
+        ),
+        NormativeReference(
+            code="IRAM 2529",
+            title="Inspección periódica de cilindros",
+            issuing_body="IRAM",
+            current_version="TEST",
+            is_current=True,
+        ),
+    ]
+    db_session.add_all(norms)
+    await db_session.flush()
+    db_session.add_all([
+        NormativeVersion(
+            reference_id=norm.id,
+            version_code=norm.current_version,
+            is_active=True,
+        )
+        for norm in norms
+    ])
+    await db_session.commit()
+    return norms
 
 
 @pytest.mark.asyncio
@@ -76,100 +112,98 @@ async def test_compliance_engine_evaluation_logic():
 
 
 @pytest.mark.asyncio
-async def test_normative_catalog_and_currency_endpoints():
+async def test_normative_catalog_and_currency_endpoints(client: AsyncClient, normative_catalog):
     """Valida los endpoints REST del catálogo de normativas y chequeo de vigencia"""
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        # Catálogo general
-        res = await client.get("/api/v1/normatives")
-        assert res.status_code == 200
-        normatives = res.json()
-        assert len(normatives) >= 3
+    # Catálogo general
+    res = await client.get("/api/v1/normatives")
+    assert res.status_code == 200
+    normatives = res.json()
+    assert len(normatives) >= 3
 
-        codes = [n["code"] for n in normatives]
-        assert "ISO 7396-1:2016" in codes
-        assert "Res1130/2000" in codes
+    codes = [n["code"] for n in normatives]
+    assert "ISO 7396-1:2016" in codes
+    assert "Res1130/2000" in codes
 
-        # Chequeo de vigencia de plantilla de Manifold
-        res_tmpl = await client.get("/api/v1/checklists/template?asset_type=MANIFOLD")
-        assert res_tmpl.status_code == 200
-        template_id = res_tmpl.json()["id"]
+    # Chequeo de vigencia de plantilla de Manifold
+    res_tmpl = await client.get("/api/v1/checklists/template?asset_type=MANIFOLD")
+    assert res_tmpl.status_code == 200
+    template_id = res_tmpl.json()["id"]
 
-        res_check = await client.get(f"/api/v1/normatives/templates/{template_id}/currency-check")
-        assert res_check.status_code == 200
-        report = res_check.json()
-        assert "all_current" in report
-        assert report["all_current"] is True
-        assert len(report["clauses"]) > 0
+    res_check = await client.get(f"/api/v1/normatives/templates/{template_id}/currency-check")
+    assert res_check.status_code == 200
+    report = res_check.json()
+    assert "all_current" in report
+    assert report["all_current"] is True
+    assert len(report["clauses"]) > 0
 
 
 @pytest.mark.asyncio
-async def test_inspection_realtime_compliance_and_audit_flow():
+async def test_inspection_realtime_compliance_and_audit_flow(client: AsyncClient, normative_catalog):
     """Valida el ciclo completo de auditoría en tiempo real sobre una inspección clínica"""
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        # 1. Obtener un activo
-        res_hier = await client.get("/api/v1/hierarchy")
-        assert res_hier.status_code == 200
-        asset = res_hier.json()["hospitals"][0]["sectors"][0]["assets"][0]
+    # 1. Obtener un activo
+    res_hier = await client.get("/api/v1/hierarchy")
+    assert res_hier.status_code == 200
+    asset = res_hier.json()["hospitals"][0]["sectors"][0]["assets"][0]
 
-        # 2. Iniciar inspección
-        res_create = await client.post("/api/v1/inspections", json={
-            "asset_id": asset["id"],
-            "inspector_name": "Bioing. Auditor Test",
-            "notes": "Prueba de auditoría y compliance"
-        })
-        assert res_create.status_code == 201
-        inspection = res_create.json()
-        insp_id = inspection["id"]
+    # 2. Iniciar inspección
+    res_create = await client.post("/api/v1/inspections", json={
+        "asset_id": asset["id"],
+        "inspector_name": "Bioing. Auditor Test",
+        "notes": "Prueba de auditoría y compliance"
+    })
+    assert res_create.status_code == 201
+    inspection = res_create.json()
+    insp_id = inspection["id"]
 
-        # Traer template para conocer los IDs de ítems
-        res_insp = await client.get(f"/api/v1/inspections/{insp_id}")
-        assert res_insp.status_code == 200
-        detail = res_insp.json()
-        items = detail["template"]["items"]
+    # Traer template para conocer los IDs de ítems
+    res_insp = await client.get(f"/api/v1/inspections/{insp_id}")
+    assert res_insp.status_code == 200
+    detail = res_insp.json()
+    items = detail["template"]["items"]
 
-        # 3. Guardar respuestas con un desvío (uno conforme, uno fuera de rango)
-        num_item = next(i for i in items if i["input_type"] == "NUMERIC")
-        bool_item = next(i for i in items if i["input_type"] == "BOOLEAN")
+    # 3. Guardar respuestas con un desvío (uno conforme, uno fuera de rango)
+    num_item = next(i for i in items if i["input_type"] == "NUMERIC")
+    bool_item = next(i for i in items if i["input_type"] == "BOOLEAN")
 
-        batch_payload = {
-            "responses": [
-                {
-                    "item_id": num_item["id"],
-                    "val_numeric": 1.5,  # Fuera de rango para generar desvío
-                    "observations": "Presión muy baja detectada en rampa"
-                },
-                {
-                    "item_id": bool_item["id"],
-                    "val_boolean": True,
-                    "observations": "Conforme"
-                }
-            ]
-        }
+    batch_payload = {
+        "responses": [
+            {
+                "item_id": num_item["id"],
+                "val_numeric": 1.5,  # Fuera de rango para generar desvío
+                "observations": "Presión muy baja detectada en rampa"
+            },
+            {
+                "item_id": bool_item["id"],
+                "val_boolean": True,
+                "observations": "Conforme"
+            }
+        ]
+    }
 
-        res_batch = await client.put(f"/api/v1/inspections/{insp_id}/batch-responses", json=batch_payload)
-        assert res_batch.status_code == 200
-        updated = res_batch.json()
+    res_batch = await client.put(f"/api/v1/inspections/{insp_id}/batch-responses", json=batch_payload)
+    assert res_batch.status_code == 200
+    updated = res_batch.json()
 
-        # Debe incluir compliance_summary en la respuesta
-        assert "compliance_summary" in updated
-        summary = updated["compliance_summary"]
-        assert summary is not None
-        assert summary["non_compliant_items"] >= 1
-        assert summary["compliant_items"] >= 1
-        assert summary["is_fully_compliant"] is False
+    # Debe incluir compliance_summary en la respuesta
+    assert "compliance_summary" in updated
+    summary = updated["compliance_summary"]
+    assert summary is not None
+    assert summary["non_compliant_items"] >= 1
+    assert summary["compliant_items"] >= 1
+    assert summary["is_fully_compliant"] is False
 
-        # 4. Endpoint directo de compliance
-        res_comp = await client.get(f"/api/v1/inspections/{insp_id}/compliance")
-        assert res_comp.status_code == 200
-        comp_data = res_comp.json()
-        assert comp_data["inspection_id"] == insp_id
-        assert len(comp_data["results"]) == len(items)
+    # 4. Endpoint directo de compliance
+    res_comp = await client.get(f"/api/v1/inspections/{insp_id}/compliance")
+    assert res_comp.status_code == 200
+    comp_data = res_comp.json()
+    assert comp_data["inspection_id"] == insp_id
+    assert len(comp_data["results"]) == len(items)
 
-        # 5. Endpoint de audit-logs inmutable
-        res_logs = await client.get(f"/api/v1/audit-logs?inspection_id={insp_id}")
-        assert res_logs.status_code == 200
-        logs = res_logs.json()
-        assert len(logs) >= 1
-        assert logs[0]["event_type"] == "VALIDATION_RUN"
+    # 5. Verificar la validación sin depender del orden de las alertas posteriores.
+    res_logs = await client.get(
+        f"/api/v1/audit-logs?inspection_id={insp_id}&event_type=VALIDATION_RUN"
+    )
+    assert res_logs.status_code == 200
+    logs = res_logs.json()
+    assert len(logs) >= 1
+    assert logs[0]["event_type"] == "VALIDATION_RUN"

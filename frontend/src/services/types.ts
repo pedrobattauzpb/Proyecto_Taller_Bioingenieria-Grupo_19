@@ -24,6 +24,7 @@ export interface InspectionEvidence {
   file_size_bytes?: number | null;
   uploaded_at: string;
   uploaded_by?: string | null;
+  uploaded_by_id?: number | null;
 }
 
 export interface Asset {
@@ -112,6 +113,8 @@ export interface InspectionDetail {
   asset_id: number;
   template_id: number;
   inspector_name: string;
+  inspector_id?: number | null;
+  completed_by_id?: number | null;
   status: InspectionStatus;
   started_at: string;
   completed_at?: string | null;
@@ -135,11 +138,29 @@ export type AuditEventType =
   | 'NORM_UPDATE'
   | 'TEMPLATE_VERSION_CHANGE'
   | 'INSPECTION_COMPLETED'
+  | 'INSPECTION_STARTED'
+  | 'EVIDENCE_UPLOADED'
+  | 'EVIDENCE_DELETED'
   | 'ALERT_RAISED'
   | 'ALERT_ACKNOWLEDGED'
   | 'ALERT_RESOLVED'
   | 'ALERT_ESCALATED'
-  | 'ALERT_SILENCED';
+  | 'ALERT_SILENCED'
+  | 'LOGIN_SUCCESS'
+  | 'LOGIN_FAILED'
+  | 'LOGOUT'
+  | 'PASSWORD_CHANGED'
+  | 'PASSWORD_RESET_REQUESTED'
+  | 'ACCOUNT_LOCKED'
+  | 'ACCOUNT_UNLOCKED'
+  | 'USER_CREATED'
+  | 'USER_UPDATED'
+  | 'USER_DEACTIVATED'
+  | 'USER_ACTIVATED'
+  | 'USER_ROLE_CHANGED'
+  | 'USER_HOSPITALS_CHANGED'
+  | 'ACCESS_DENIED'
+  | 'TOKEN_REFRESH_REUSE_DETECTED';
 
 export interface NormativeVersion {
   id: number;
@@ -230,6 +251,9 @@ export interface AuditLogEntry {
   event_type: AuditEventType;
   event_detail: Record<string, any>;
   actor: string;
+  actor_user_id?: number | null;
+  ip_address?: string | null;
+  user_agent?: string | null;
   created_at: string;
 }
 
@@ -241,6 +265,8 @@ export interface InspectionHistoryItem {
   asset_type: string;
   template_title: string;
   inspector_name: string;
+  inspector_id?: number | null;
+  completed_by_id?: number | null;
   status: InspectionStatus;
   started_at: string;
   completed_at?: string | null;
@@ -268,7 +294,7 @@ export interface StatsOverviewResponse {
 export interface CreateInspectionPayload {
   asset_id: number;
   template_id?: number;
-  inspector_name: string;
+  inspector_name?: string;
   notes?: string;
 }
 
@@ -375,8 +401,10 @@ export interface Alert {
   last_detected_at: string;
   acknowledged_at?: string | null;
   acknowledged_by?: string | null;
+  acknowledged_by_id?: number | null;
   resolved_at?: string | null;
   resolved_by?: string | null;
+  resolved_by_id?: number | null;
   resolution_note?: string | null;
   escalation_level: number;
   last_escalated_at?: string | null;
@@ -458,3 +486,126 @@ export interface AlertStreamEvent {
   data: any;
 }
 
+// ============================================================================
+// Autenticación, RBAC y Gestión de Usuarios (Objetivo Específico 6)
+// ============================================================================
+
+export type UserRole = 'TECHNICIAN' | 'SUPERVISOR' | 'AUDITOR' | 'ADMIN';
+
+export type Permission =
+  | 'hierarchy:read'
+  | 'hierarchy:write'
+  | 'templates:read'
+  | 'templates:write'
+  | 'normatives:read'
+  | 'normatives:write'
+  | 'inspections:read_own'
+  | 'inspections:read_completed'
+  | 'inspections:read_all'
+  | 'inspections:create'
+  | 'inspections:execute_own'
+  | 'inspections:execute_all'
+  | 'inspections:complete_own'
+  | 'inspections:complete_all'
+  | 'evidence:read'
+  | 'evidence:delete_own'
+  | 'evidence:delete_all'
+  | 'compliance:read'
+  | 'compliance:recalculate'
+  | 'audit_logs:read'
+  | 'reports:inspection'
+  | 'reports:asset_history'
+  | 'reports:executive'
+  | 'stats:read'
+  | 'alerts:read'
+  | 'alerts:acknowledge'
+  | 'alerts:resolve'
+  | 'alerts:silence'
+  | 'alerts:run_checks'
+  | 'notifications:manage'
+  | 'users:read'
+  | 'users:manage_technicians'
+  | 'users:manage';
+
+export interface CurrentUser {
+  id: number;
+  email: string;
+  full_name: string;
+  professional_license?: string | null;
+  role: UserRole;
+  is_active: boolean;
+  has_global_scope: boolean;
+  must_change_password: boolean;
+  hospital_ids: number[];
+  permissions: Permission[];
+}
+
+export interface TokenPair {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+export interface LoginResponse extends TokenPair {
+  user: CurrentUser;
+}
+
+export interface StreamTicketResponse {
+  ticket: string;
+  expires_in: number;
+}
+
+export interface UserRead {
+  id: number;
+  email: string;
+  full_name: string;
+  professional_license?: string | null;
+  role: UserRole;
+  is_active: boolean;
+  has_global_scope: boolean;
+  must_change_password: boolean;
+  failed_login_attempts: number;
+  locked_until?: string | null;
+  last_login_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  hospital_ids: number[];
+  temporary_password?: string | null;
+}
+
+export interface UserCreate {
+  email: string;
+  full_name: string;
+  professional_license?: string | null;
+  role?: UserRole;
+  password?: string;
+  hospital_ids?: number[];
+  has_global_scope?: boolean;
+}
+
+export interface UserUpdate {
+  full_name?: string;
+  professional_license?: string | null;
+  role?: UserRole;
+  email?: string;
+  is_active?: boolean;
+  has_global_scope?: boolean;
+  hospital_ids?: number[];
+}
+
+export interface UserHospitalsUpdate {
+  hospital_ids: number[];
+  has_global_scope: boolean;
+}
+
+export interface PasswordResetResponse {
+  temporary_password: string;
+}
+
+export interface RoleInfo {
+  role: string;
+  name: string;
+  description: string;
+  permissions: Permission[];
+}

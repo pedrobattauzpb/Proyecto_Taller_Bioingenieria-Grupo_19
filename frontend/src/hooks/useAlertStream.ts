@@ -82,15 +82,25 @@ export function useAlertStream({
     pollingIntervalRef.current = window.setInterval(poll, POLLING_INTERVAL_MS);
   }, [hospitalId, clearTimers, closeEventSource]);
 
-  // Conexión SSE con EventSource
-  const connectSSE = useCallback(() => {
+  // Conexión SSE con EventSource autenticada mediante stream ticket de 60s (P2 / OE-6)
+  const connectSSE = useCallback(async () => {
     if (!enabled || isPausedRef.current) return;
 
     clearTimers();
     closeEventSource();
 
     try {
-      const streamUrl = apiService.alertStreamUrl(hospitalId);
+      let ticket: string | undefined;
+      try {
+        const ticketRes = await apiService.getStreamTicket();
+        ticket = ticketRes.ticket;
+      } catch (ticketErr) {
+        console.warn('[useAlertStream] No se pudo obtener stream ticket para SSE, activando polling:', ticketErr);
+        startPolling();
+        return;
+      }
+
+      const streamUrl = apiService.alertStreamUrl(hospitalId, ticket);
       const es = new EventSource(streamUrl);
       eventSourceRef.current = es;
 

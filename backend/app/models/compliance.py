@@ -42,7 +42,23 @@ class AuditEventType(str, enum.Enum):
     ALERT_RESOLVED = "ALERT_RESOLVED"
     ALERT_ESCALATED = "ALERT_ESCALATED"
     ALERT_SILENCED = "ALERT_SILENCED"
-
+    # OE-6 Seguridad y roles
+    LOGIN_SUCCESS = "LOGIN_SUCCESS"
+    LOGIN_FAILED = "LOGIN_FAILED"
+    LOGOUT = "LOGOUT"
+    TOKEN_REFRESH_REUSE_DETECTED = "TOKEN_REFRESH_REUSE_DETECTED"
+    ACCOUNT_LOCKED = "ACCOUNT_LOCKED"
+    PASSWORD_CHANGED = "PASSWORD_CHANGED"
+    PASSWORD_RESET = "PASSWORD_RESET"
+    USER_CREATED = "USER_CREATED"
+    USER_UPDATED = "USER_UPDATED"
+    USER_ROLE_CHANGED = "USER_ROLE_CHANGED"
+    USER_DEACTIVATED = "USER_DEACTIVATED"
+    USER_ACTIVATED = "USER_ACTIVATED"
+    USER_SCOPE_CHANGED = "USER_SCOPE_CHANGED"
+    ACCESS_DENIED = "ACCESS_DENIED"
+    INSPECTION_STARTED = "INSPECTION_STARTED"
+    EVIDENCE_DELETED = "EVIDENCE_DELETED"
 
 
 class NormativeReference(Base):
@@ -117,7 +133,11 @@ class AuditLog(Base):
     event_type = Column(Enum(AuditEventType), nullable=False, index=True)
     event_detail = Column(JSON, nullable=False)
     actor = Column(String(255), nullable=False, default="SYSTEM")
+    actor_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Relación
     inspection = relationship("Inspection", backref="audit_logs")
+    actor_user = relationship("User", foreign_keys=[actor_user_id])

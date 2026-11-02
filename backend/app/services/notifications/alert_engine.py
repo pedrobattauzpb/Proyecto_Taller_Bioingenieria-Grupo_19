@@ -106,6 +106,37 @@ class AlertEngine:
             resolved_at = now
             resolved_by = "SYSTEM"
 
+        if hospital_id is None:
+            if scope_type == AlertScopeType.ASSET or asset_id:
+                aid = asset_id or scope_id
+                from app.models.hierarchy import Asset, Sector
+                from sqlalchemy.orm import selectinload
+                a_res = await db.execute(select(Asset).options(selectinload(Asset.sector)).where(Asset.id == aid))
+                asset_obj = a_res.scalar_one_or_none()
+                if asset_obj and asset_obj.sector:
+                    hospital_id = asset_obj.sector.hospital_id
+                    if sector_id is None:
+                        sector_id = asset_obj.sector_id
+                    if asset_id is None:
+                        asset_id = asset_obj.id
+            elif scope_type == AlertScopeType.INSPECTION or inspection_id:
+                iid = inspection_id or scope_id
+                from app.models.inspection import Inspection
+                from app.models.hierarchy import Asset, Sector
+                from sqlalchemy.orm import selectinload
+                i_res = await db.execute(
+                    select(Inspection)
+                    .options(selectinload(Inspection.asset).selectinload(Asset.sector))
+                    .where(Inspection.id == iid)
+                )
+                insp_obj = i_res.scalar_one_or_none()
+                if insp_obj and insp_obj.asset and insp_obj.asset.sector:
+                    hospital_id = insp_obj.asset.sector.hospital_id
+                    if sector_id is None:
+                        sector_id = insp_obj.asset.sector_id
+                    if asset_id is None:
+                        asset_id = insp_obj.asset_id
+
         new_alert = Alert(
             fingerprint=fingerprint,
             rule_code=rule_code,
@@ -452,8 +483,11 @@ class AlertEngine:
     async def acknowledge(
         db: AsyncSession,
         alert_id: int,
-        actor: str,
+        actor: Optional[str] = None,
         note: Optional[str] = None,
+        user: Optional[Any] = None,
+        ip: str = "",
+        user_agent: str = "",
     ) -> Alert:
         stmt = select(Alert).where(Alert.id == alert_id)
         res = await db.execute(stmt)
@@ -468,15 +502,25 @@ class AlertEngine:
             )
 
         now = utc_now_naive()
+        user_id = user.id if user else None
+        if not actor and user:
+            lic = f" (Mat. {user.professional_license})" if user.professional_license else ""
+            actor = f"{user.full_name}{lic} <{user.email}>"
+        actor_name = actor or "SYSTEM"
+
         alert.status = AlertStatus.ACKNOWLEDGED
         alert.acknowledged_at = now
-        alert.acknowledged_by = actor
+        alert.acknowledged_by = actor_name
+        alert.acknowledged_by_id = user_id
         alert.updated_at = now
 
         audit = AuditLog(
             inspection_id=alert.inspection_id,
             event_type=AuditEventType.ALERT_ACKNOWLEDGED,
-            actor=actor,
+            actor=actor_name,
+            actor_user_id=user_id,
+            ip_address=ip[:45] if ip else None,
+            user_agent=user_agent[:255] if user_agent else None,
             event_detail={
                 "alert_id": alert.id,
                 "rule_code": alert.rule_code,
@@ -495,8 +539,11 @@ class AlertEngine:
     async def resolve(
         db: AsyncSession,
         alert_id: int,
-        actor: str,
+        actor: Optional[str] = None,
         note: Optional[str] = None,
+        user: Optional[Any] = None,
+        ip: str = "",
+        user_agent: str = "",
     ) -> Alert:
         stmt = select(Alert).where(Alert.id == alert_id)
         res = await db.execute(stmt)
@@ -511,16 +558,26 @@ class AlertEngine:
             )
 
         now = utc_now_naive()
+        user_id = user.id if user else None
+        if not actor and user:
+            lic = f" (Mat. {user.professional_license})" if user.professional_license else ""
+            actor = f"{user.full_name}{lic} <{user.email}>"
+        actor_name = actor or "SYSTEM"
+
         alert.status = AlertStatus.RESOLVED
         alert.resolved_at = now
-        alert.resolved_by = actor
+        alert.resolved_by = actor_name
+        alert.resolved_by_id = user_id
         alert.resolution_note = note
         alert.updated_at = now
 
         audit = AuditLog(
             inspection_id=alert.inspection_id,
             event_type=AuditEventType.ALERT_RESOLVED,
-            actor=actor,
+            actor=actor_name,
+            actor_user_id=user_id,
+            ip_address=ip[:45] if ip else None,
+            user_agent=user_agent[:255] if user_agent else None,
             event_detail={
                 "alert_id": alert.id,
                 "rule_code": alert.rule_code,
@@ -539,9 +596,12 @@ class AlertEngine:
     async def silence(
         db: AsyncSession,
         alert_id: int,
-        actor: str,
-        until: datetime,
+        actor: Optional[str] = None,
+        until: Optional[datetime] = None,
         note: Optional[str] = None,
+        user: Optional[Any] = None,
+        ip: str = "",
+        user_agent: str = "",
     ) -> Alert:
         stmt = select(Alert).where(Alert.id == alert_id)
         res = await db.execute(stmt)
@@ -573,6 +633,12 @@ class AlertEngine:
                 detail=f"La alerta reglamentaria {alert.rule_code} no puede silenciarse por imperativo legal",
             )
 
+        user_id = user.id if user else None
+        if not actor and user:
+            lic = f" (Mat. {user.professional_license})" if user.professional_license else ""
+            actor = f"{user.full_name}{lic} <{user.email}>"
+        actor_name = actor or "SYSTEM"
+
         alert.status = AlertStatus.SILENCED
         alert.silenced_until = until_naive
         alert.updated_at = now
@@ -580,7 +646,10 @@ class AlertEngine:
         audit = AuditLog(
             inspection_id=alert.inspection_id,
             event_type=AuditEventType.ALERT_SILENCED,
-            actor=actor,
+            actor=actor_name,
+            actor_user_id=user_id,
+            ip_address=ip[:45] if ip else None,
+            user_agent=user_agent[:255] if user_agent else None,
             event_detail={
                 "alert_id": alert.id,
                 "rule_code": alert.rule_code,
@@ -599,8 +668,16 @@ class AlertEngine:
     async def bulk_acknowledge(
         db: AsyncSession,
         ids: List[int],
-        actor: str,
+        actor: Optional[str] = None,
+        user: Optional[Any] = None,
+        ip: str = "",
+        user_agent: str = "",
     ) -> int:
+        if not actor and user:
+            lic = f" (Mat. {user.professional_license})" if user.professional_license else ""
+            actor = f"{user.full_name}{lic} <{user.email}>"
+        actor = actor or "SYSTEM"
+        user_id = user.id if user else None
         count = 0
         now = utc_now_naive()
         for alert_id in ids:
@@ -617,6 +694,9 @@ class AlertEngine:
                     inspection_id=alert.inspection_id,
                     event_type=AuditEventType.ALERT_ACKNOWLEDGED,
                     actor=actor,
+                    actor_user_id=user_id,
+                    ip_address=ip[:45] if ip else None,
+                    user_agent=user_agent[:255] if user_agent else None,
                     event_detail={"alert_id": alert.id, "rule_code": alert.rule_code, "action": "bulk"},
                     created_at=now,
                 )

@@ -16,7 +16,7 @@ interface AlertActionsDialogProps {
   onConfirm: (payload: {
     alertId: number;
     action: AlertActionType;
-    actor: string;
+    actor?: string;
     note?: string;
     until?: string;
   }) => Promise<void>;
@@ -29,7 +29,6 @@ export const AlertActionsDialog: React.FC<AlertActionsDialogProps> = ({
   actionType,
   onConfirm,
 }) => {
-  const [actor, setActor] = useState<string>('Bioing. Santiago');
   const [note, setNote] = useState<string>('');
   const [silenceHours, setSilenceHours] = useState<number>(4);
   const [loading, setLoading] = useState<boolean>(false);
@@ -37,10 +36,6 @@ export const AlertActionsDialog: React.FC<AlertActionsDialogProps> = ({
 
   useEffect(() => {
     if (open) {
-      const stored = localStorage.getItem('gmao.inspectorName');
-      if (stored) {
-        setActor(stored);
-      }
       setNote('');
       setError(null);
       setSilenceHours(4);
@@ -57,11 +52,6 @@ export const AlertActionsDialog: React.FC<AlertActionsDialogProps> = ({
       (isCritical && alert.source === 'NORMATIVE'));
 
   const handleExecute = async () => {
-    if (!actor.trim()) {
-      setError('El nombre del profesional u operador es obligatorio.');
-      return;
-    }
-
     if (actionType === 'resolve' && isCritical && !note.trim()) {
       setError(
         'Para desvíos con severidad CRÍTICA es obligatorio detallar la nota de resolución técnica antes de cerrar.'
@@ -84,13 +74,9 @@ export const AlertActionsDialog: React.FC<AlertActionsDialogProps> = ({
         untilIso = untilDate.toISOString();
       }
 
-      // Guardar el operador en localStorage
-      localStorage.setItem('gmao.inspectorName', actor.trim());
-
       await onConfirm({
         alertId: alert.id,
         action: actionType,
-        actor: actor.trim(),
         note: note.trim() || undefined,
         until: untilIso,
       });
@@ -183,13 +169,6 @@ export const AlertActionsDialog: React.FC<AlertActionsDialogProps> = ({
           )}
 
           <div className="flex flex-col gap-3">
-            <Input
-              label="Profesional / Operador que actúa"
-              value={actor}
-              onChangeText={setActor}
-              placeholder="Ej: Bioing. Juan Pérez"
-            />
-
             {actionType === 'silence' && (
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-[var(--ink)]">

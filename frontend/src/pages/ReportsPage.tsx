@@ -24,10 +24,12 @@ import { Input } from '../components/ui/Input';
 import { SectorComplianceChart } from '../components/reports/SectorComplianceChart';
 import { AssetTypeComplianceChart } from '../components/reports/AssetTypeComplianceChart';
 import { SeverityPieChart } from '../components/reports/SeverityPieChart';
+import { usePermission } from '../hooks/usePermission';
 import { cn } from '../lib/utils';
 
 export const ReportsPage: React.FC = () => {
   const navigate = useNavigate();
+  const { can } = usePermission();
 
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [selectedHospitalId, setSelectedHospitalId] = useState<number | null>(null);
@@ -184,22 +186,26 @@ export const ReportsPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            title="Informe Ejecutivo PDF"
-            variant="primary"
-            size="sm"
-            icon={<FileDown className="w-4 h-4" />}
-            onClick={handleDownloadExecutivePdf}
-            loading={downloadingExecPdf}
-          />
-          <Button
-            title="Exportar Excel"
-            variant="outline"
-            size="sm"
-            icon={<FileSpreadsheet className="w-4 h-4" />}
-            onClick={handleDownloadExecutiveExcel}
-            loading={downloadingExecExcel}
-          />
+          {can('reports:executive') && (
+            <>
+              <Button
+                title="Informe Ejecutivo PDF"
+                variant="primary"
+                size="sm"
+                icon={<FileDown className="w-4 h-4" />}
+                onClick={handleDownloadExecutivePdf}
+                loading={downloadingExecPdf}
+              />
+              <Button
+                title="Exportar Excel"
+                variant="outline"
+                size="sm"
+                icon={<FileSpreadsheet className="w-4 h-4" />}
+                onClick={handleDownloadExecutiveExcel}
+                loading={downloadingExecExcel}
+              />
+            </>
+          )}
           <button
             type="button"
             onClick={loadInitialData}

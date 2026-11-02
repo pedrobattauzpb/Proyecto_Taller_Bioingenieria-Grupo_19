@@ -23,8 +23,8 @@ class Inspection(Base):
     completed_at = Column(DateTime, nullable=True)
     notes = Column(Text, nullable=True)
 
-    # Campos reservados para fases futuras (Firma/Inspector y Adjuntos multimedia)
-    inspector_id = Column(Integer, nullable=True)
+    inspector_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    completed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     attachments = Column(JSON, nullable=True)
 
     # Relaciones
@@ -32,6 +32,8 @@ class Inspection(Base):
     template = relationship("ChecklistTemplate", back_populates="inspections")
     responses = relationship("InspectionResponse", back_populates="inspection", cascade="all, delete-orphan")
     evidences = relationship("InspectionEvidence", back_populates="inspection", cascade="all, delete-orphan")
+    inspector = relationship("User", foreign_keys=[inspector_id], backref="inspections")
+    completed_by = relationship("User", foreign_keys=[completed_by_id])
 
 
 class InspectionResponse(Base):

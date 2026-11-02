@@ -444,3 +444,71 @@ class ComplianceEngine:
                 for cr in compliance_models
             ]
         )
+
+
+    @classmethod
+    async def get_existing_compliance_summary(cls, inspection_id: int, db: AsyncSession) -> ComplianceSummary:
+        """Devuelve los últimos resultados de compliance guardados sin recalcular ni escribir en la base."""
+        inspection = await db.get(Inspection, inspection_id)
+        if not inspection:
+            raise HTTPException(status_code=404, detail="Inspección no encontrada")
+
+        stmt = select(ComplianceResult).where(ComplianceResult.inspection_id == inspection_id).order_by(ComplianceResult.id)
+        res = await db.execute(stmt)
+        results = res.scalars().all()
+
+        tmpl_stmt = select(ChecklistTemplate).options(selectinload(ChecklistTemplate.items)).where(ChecklistTemplate.id == inspection.template_id)
+        tmpl_res = await db.execute(tmpl_stmt)
+        tmpl = tmpl_res.scalars().first()
+        total_items = len(tmpl.items) if tmpl and tmpl.items else len(results)
+
+        compliant_count = sum(1 for r in results if r.compliance_status == ComplianceStatus.COMPLIANT)
+        non_compliant_count = sum(1 for r in results if r.compliance_status == ComplianceStatus.NON_COMPLIANT)
+        warning_count = sum(1 for r in results if r.compliance_status == ComplianceStatus.WARNING)
+        evaluated_items = compliant_count + non_compliant_count + warning_count
+        pending_count = total_items - evaluated_items if total_items > evaluated_items else 0
+
+        crit_count = sum(1 for r in results if r.severity == ComplianceSeverity.CRITICAL and r.compliance_status == ComplianceStatus.NON_COMPLIANT)
+        major_count = sum(1 for r in results if r.severity == ComplianceSeverity.MAJOR and r.compliance_status == ComplianceStatus.NON_COMPLIANT)
+        minor_count = sum(1 for r in results if (r.severity == ComplianceSeverity.MINOR or r.compliance_status == ComplianceStatus.WARNING))
+        obs_count = sum(1 for r in results if r.severity == ComplianceSeverity.OBSERVATION)
+
+        compliance_pct = round((compliant_count / total_items * 100.0), 1) if total_items > 0 else 0.0
+        is_fully_compliant = (non_compliant_count == 0 and pending_count == 0 and total_items > 0)
+        currency_report = await cls.check_normative_currency(inspection.template_id, db)
+
+        return ComplianceSummary(
+            inspection_id=inspection.id,
+            status=inspection.status.value,
+            total_items=total_items,
+            evaluated_items=evaluated_items,
+            compliant_items=compliant_count,
+            non_compliant_items=non_compliant_count,
+            warning_items=warning_count,
+            pending_items=pending_count,
+            compliance_percentage=compliance_pct,
+            is_fully_compliant=is_fully_compliant,
+            critical_deviations_count=crit_count,
+            major_deviations_count=major_count,
+            minor_deviations_count=minor_count,
+            observation_deviations_count=obs_count,
+            normative_currency=currency_report,
+            results=[
+                ComplianceResultRead(
+                    id=cr.id,
+                    inspection_id=cr.inspection_id,
+                    item_id=cr.item_id,
+                    response_id=cr.response_id,
+                    compliance_status=cr.compliance_status,
+                    normative_ref=cr.normative_ref,
+                    expected_value=cr.expected_value,
+                    actual_value=cr.actual_value,
+                    deviation_detail=cr.deviation_detail,
+                    severity=cr.severity,
+                    validated_at=cr.validated_at,
+                    normative_version_id=cr.normative_version_id
+                )
+                for cr in results
+            ]
+        )
+

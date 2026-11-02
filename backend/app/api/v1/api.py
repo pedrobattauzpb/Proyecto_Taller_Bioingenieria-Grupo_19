@@ -1,5 +1,7 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
+    auth,
+    users,
     hierarchy,
     checklists,
     inspections,
@@ -13,6 +15,10 @@ from app.api.v1.endpoints import (
 )
 
 api_router = APIRouter()
+
+api_router.include_router(auth.auth_router, prefix="/auth", tags=["Autenticación"])
+api_router.include_router(users.users_router, prefix="/users", tags=["Usuarios"])
+api_router.include_router(users.roles_router, prefix="/roles", tags=["Roles"])
 
 api_router.include_router(hierarchy.router, prefix="/hierarchy", tags=["Jerarquía Hospitalaria"])
 api_router.include_router(checklists.router, prefix="/checklists", tags=["Plantillas y Checklists"])

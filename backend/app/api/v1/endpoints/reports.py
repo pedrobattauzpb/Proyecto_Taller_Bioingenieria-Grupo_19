@@ -8,8 +8,20 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
+from app.core.permissions import Permission
+from app.api.deps import require_permissions
+from app.services.access_control import (
+    assert_can_read_inspection,
+    assert_hospital_in_scope,
+    scope_filter_hospital_ids,
+)
+from app.models.user import User
+from app.models.inspection import Inspection
+from app.models.hierarchy import Asset
 from app.services.report_engine import (
     InspectionPDFGenerator,
     AssetHistoryPDFGenerator,
@@ -40,17 +52,27 @@ _executive_excel_gen = ExecutiveExcelGenerator()
 async def download_inspection_pdf(
     inspection_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permissions(Permission.REPORTS_INSPECTION)),
 ):
     """
     Genera y descarga el **Acta Oficial de Inspección Técnica** en formato PDF A4.
-    Incluye:
-    - Ficha institucional y datos del componente auditado.
-    - Dictamen de cumplimiento normativo y nivel porcentual.
-    - Tabla detallada de puntos de control con tolerancias y dictamen semáforo.
-    - Sección de no conformidades y desvíos críticos.
-    - Lista de evidencias multimedia y trazabilidad de vigencia normativa.
-    - Firma y sello del Bioingeniero actuante.
+    Requiere permiso `reports:inspection` y valida regla O+C.
     """
+    stmt = (
+        select(Inspection)
+        .where(Inspection.id == inspection_id)
+        .options(selectinload(Inspection.asset).selectinload(Asset.sector))
+    )
+    res = await db.execute(stmt)
+    inspection = res.scalar_one_or_none()
+    if not inspection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Inspección #{inspection_id} no encontrada.",
+        )
+
+    await assert_can_read_inspection(current_user, inspection, db)
+
     data = await assemble_inspection_report_data(inspection_id, db)
     if not data:
         raise HTTPException(
@@ -82,11 +104,27 @@ async def download_inspection_pdf(
 async def download_inspection_excel(
     inspection_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permissions(Permission.REPORTS_INSPECTION)),
 ):
     """
-    Exporta la auditoría completa en formato Microsoft Excel (.xlsx) estructurado
-    para análisis tabulares y presentación ante entes reguladores.
+    Exporta la auditoría completa en formato Microsoft Excel (.xlsx) estructurado.
+    Requiere permiso `reports:inspection` y valida regla O+C.
     """
+    stmt = (
+        select(Inspection)
+        .where(Inspection.id == inspection_id)
+        .options(selectinload(Inspection.asset).selectinload(Asset.sector))
+    )
+    res = await db.execute(stmt)
+    inspection = res.scalar_one_or_none()
+    if not inspection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Inspección #{inspection_id} no encontrada.",
+        )
+
+    await assert_can_read_inspection(current_user, inspection, db)
+
     data = await assemble_inspection_report_data(inspection_id, db)
     if not data:
         raise HTTPException(
@@ -118,12 +156,27 @@ async def download_inspection_excel(
 async def download_asset_history_pdf(
     asset_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permissions(Permission.REPORTS_ASSET_HISTORY)),
 ):
     """
     Genera el informe histórico completo de un activo clínico.
-    Muestra evolución de cumplimiento a lo largo del tiempo,
-    frecuencia de inspecciones y análisis de no conformidades recurrentes.
+    Requiere permiso `reports:asset_history` y valida pertenencia de hospital.
     """
+    stmt = (
+        select(Asset)
+        .where(Asset.id == asset_id)
+        .options(selectinload(Asset.sector))
+    )
+    res = await db.execute(stmt)
+    asset = res.scalar_one_or_none()
+    if not asset or not asset.sector:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Activo #{asset_id} no encontrado.",
+        )
+
+    assert_hospital_in_scope(current_user, asset.sector.hospital_id)
+
     data = await assemble_asset_history_report_data(asset_id, db)
     if not data:
         raise HTTPException(
@@ -155,12 +208,25 @@ async def download_asset_history_pdf(
 async def download_executive_pdf(
     hospital_id: Optional[int] = Query(None, description="ID del hospital a auditar"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permissions(Permission.REPORTS_EXECUTIVE)),
 ):
     """
     Genera el Informe Ejecutivo Institucional para Dirección Médica y Calidad.
-    Resume el estado legal y técnico de toda la red de gases del establecimiento.
+    Requiere permiso `reports:executive` (Supervisor, Auditor, Admin).
     """
-    data = await assemble_executive_report_data(hospital_id, db)
+    target_hospital_id = hospital_id
+    if target_hospital_id is not None:
+        assert_hospital_in_scope(current_user, target_hospital_id)
+    else:
+        allowed_ids = scope_filter_hospital_ids(current_user)
+        if allowed_ids is not None:
+            if not allowed_ids:
+                raise HTTPException(status_code=404, detail="No hay hospitales asignados.")
+            target_hospital_id = allowed_ids[0]
+        else:
+            target_hospital_id = None
+
+    data = await assemble_executive_report_data(target_hospital_id, db)
     if not data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -191,11 +257,25 @@ async def download_executive_pdf(
 async def download_executive_excel(
     hospital_id: Optional[int] = Query(None, description="ID del hospital a auditar"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permissions(Permission.REPORTS_EXECUTIVE)),
 ):
     """
     Exporta todas las métricas institucionales en formato Excel estructurado con hojas separadas.
+    Requiere permiso `reports:executive` (Supervisor, Auditor, Admin).
     """
-    data = await assemble_executive_report_data(hospital_id, db)
+    target_hospital_id = hospital_id
+    if target_hospital_id is not None:
+        assert_hospital_in_scope(current_user, target_hospital_id)
+    else:
+        allowed_ids = scope_filter_hospital_ids(current_user)
+        if allowed_ids is not None:
+            if not allowed_ids:
+                raise HTTPException(status_code=404, detail="No hay hospitales asignados.")
+            target_hospital_id = allowed_ids[0]
+        else:
+            target_hospital_id = None
+
+    data = await assemble_executive_report_data(target_hospital_id, db)
     if not data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -226,12 +306,26 @@ async def download_executive_excel(
 async def get_executive_report_data(
     hospital_id: Optional[int] = Query(None, description="ID del hospital"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permissions(Permission.REPORTS_EXECUTIVE)),
 ):
     """
     Retorna los datos agregados del informe ejecutivo en JSON para alimentar
     directamente los gráficos interactivos (Recharts) en la interfaz de usuario.
+    Requiere permiso `reports:executive` (Supervisor, Auditor, Admin).
     """
-    data = await assemble_executive_report_data(hospital_id, db)
+    target_hospital_id = hospital_id
+    if target_hospital_id is not None:
+        assert_hospital_in_scope(current_user, target_hospital_id)
+    else:
+        allowed_ids = scope_filter_hospital_ids(current_user)
+        if allowed_ids is not None:
+            if not allowed_ids:
+                raise HTTPException(status_code=404, detail="No hay hospitales asignados.")
+            target_hospital_id = allowed_ids[0]
+        else:
+            target_hospital_id = None
+
+    data = await assemble_executive_report_data(target_hospital_id, db)
     if not data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

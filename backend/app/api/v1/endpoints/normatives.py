@@ -1,12 +1,15 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models.compliance import NormativeReference, NormativeVersion
+from app.core.permissions import Permission
+from app.models.compliance import NormativeReference, NormativeVersion, AuditLog, AuditEventType
 from app.models.checklist import ChecklistTemplate
+from app.models.user import User
 from app.schemas.compliance import (
     NormativeReferenceRead,
     NormativeReferenceCreate,
@@ -16,6 +19,8 @@ from app.schemas.compliance import (
     NormativeCurrencyReport,
 )
 from app.services.compliance_engine import ComplianceEngine
+from app.services.auth_service import log_security_event
+from app.api.deps import require_permissions, get_request_context
 
 router = APIRouter()
 
@@ -23,6 +28,7 @@ router = APIRouter()
 @router.get("", response_model=List[NormativeReferenceRead], summary="Listar catálogo de normativas y estándares")
 async def list_normatives(
     is_current: Optional[bool] = Query(None, description="Filtrar por vigencia regulatoria"),
+    user: User = Depends(require_permissions(Permission.NORMATIVES_READ)),
     db: AsyncSession = Depends(get_db)
 ):
     """Retorna el catálogo maestro de normas (ISO 7396-1, Res. 1130/2000, IRAM 2529) con sus versiones."""
@@ -35,7 +41,11 @@ async def list_normatives(
 
 
 @router.get("/{id}", response_model=NormativeReferenceRead, summary="Detalle de una norma con versiones")
-async def get_normative(id: int, db: AsyncSession = Depends(get_db)):
+async def get_normative(
+    id: int,
+    user: User = Depends(require_permissions(Permission.NORMATIVES_READ)),
+    db: AsyncSession = Depends(get_db)
+):
     norm = await db.execute(
         select(NormativeReference)
         .options(selectinload(NormativeReference.versions))
@@ -54,11 +64,13 @@ async def get_normative(id: int, db: AsyncSession = Depends(get_db)):
 async def update_normative(
     id: int,
     norm_in: NormativeReferenceUpdate,
+    request: Request,
+    user: User = Depends(require_permissions(Permission.NORMATIVES_WRITE)),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Permite marcar una norma como superada (is_current=False) y asociar su reemplazo.
-    Esto automáticamente dispara alertas de vigencia en las inspecciones que la utilicen.
+    Permite modificar o marcar una norma como superada (is_current=False).
+    Exclusivo para el rol Administrador de Sistemas.
     """
     item = await db.get(NormativeReference, id)
     if not item:
@@ -72,17 +84,30 @@ async def update_normative(
 
     if norm_in.is_current is False:
         try:
-            from datetime import datetime, timezone
             from app.services.notifications.evaluators import evaluate_superseded_normatives
             now = datetime.now(timezone.utc).replace(tzinfo=None)
             await evaluate_superseded_normatives(db, now)
         except Exception:
             pass
 
+    ip, ua = get_request_context(request)
+    await log_security_event(
+        db=db,
+        event_type=AuditEventType.NORM_UPDATE,
+        user=user,
+        ip=ip,
+        user_agent=ua,
+        detail={
+            "normative_id": item.id,
+            "normative_code": item.code,
+            "is_current": item.is_current,
+            "superseded_by_id": item.superseded_by_id
+        }
+    )
+
     await db.commit()
     await db.refresh(item)
 
-    # Recargar con versiones
     reloaded = await db.execute(
         select(NormativeReference)
         .options(selectinload(NormativeReference.versions))
@@ -94,6 +119,7 @@ async def update_normative(
 @router.get("/templates/{template_id}/currency-check", response_model=NormativeCurrencyReport, summary="Verificar vigencia normativa de una plantilla")
 async def check_template_normative_currency(
     template_id: int,
+    user: User = Depends(require_permissions(Permission.NORMATIVES_READ)),
     db: AsyncSession = Depends(get_db)
 ):
     """

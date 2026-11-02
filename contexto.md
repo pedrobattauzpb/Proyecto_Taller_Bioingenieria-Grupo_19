@@ -44,6 +44,7 @@ Su objetivo principal es digitalizar, estandarizar y auditar de forma integral l
 | **OE-3** | Base de datos centralizada con historial detallado de inspección por componente y soporte de evidencia multimedia (fotos/videos) | ✅ Completado |
 | **OE-4** | Motor de reportes que genere informes estructurados automáticos sobre el estado de la infraestructura respecto a las normativas | ✅ Completado |
 | **OE-5** | Sistema de notificaciones capaz de emitir alertas frente a la detección de fallas o incumplimientos de la normativa (en vivo y programadas, multicanal In-App/SSE/Email/Webhook) | ✅ Completado |
+| **OE-6** | Configurar una arquitectura de seguridad y roles que gestione los niveles de acceso y permisos diferenciados para técnicos, supervisores y auditores | ✅ Completado |
 
 ---
 

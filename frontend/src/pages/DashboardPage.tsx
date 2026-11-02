@@ -21,6 +21,8 @@ import {
 import * as Dialog from '@radix-ui/react-dialog';
 import { apiService } from '../services/api';
 import { useAlerts } from '../context/AlertsContext';
+import { useAuth } from '../context/AuthContext';
+import { usePermission } from '../hooks/usePermission';
 import { AlertSeverityBadge } from '../components/alerts/AlertSeverityBadge';
 import { formatRelativeTime } from '../utils/date';
 import type {
@@ -38,6 +40,8 @@ import { cn } from '../lib/utils';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { can } = usePermission();
 
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [stats, setStats] = useState<StatsOverviewResponse | null>(null);
@@ -51,7 +55,6 @@ export const DashboardPage: React.FC = () => {
   // Modal para iniciar inspección
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [inspectorName, setInspectorName] = useState<string>('Bioing. Santiago');
   const [inspectionNotes, setInspectionNotes] = useState<string>('');
   const [startingInspection, setStartingInspection] = useState<boolean>(false);
 
@@ -164,7 +167,7 @@ export const DashboardPage: React.FC = () => {
       setStartingInspection(true);
       const newInsp = await apiService.createInspection({
         asset_id: selectedAsset.id,
-        inspector_name: inspectorName.trim() || 'Inspector Técnico',
+        inspector_name: user?.full_name || 'Inspector Técnico',
         notes: inspectionNotes.trim() || undefined,
       });
       setModalOpen(false);
@@ -436,13 +439,19 @@ export const DashboardPage: React.FC = () => {
                           <Clock className="w-3.5 h-3.5 text-[var(--ink-soft)]" />
                           <span>Historial</span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleStartInspectionModal(asset)}
-                          className="text-[11.5px] font-semibold py-1.5 px-3 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 cursor-pointer transition-opacity"
-                        >
-                          Auditar
-                        </button>
+                        {can('inspections:create') ? (
+                          <button
+                            type="button"
+                            onClick={() => handleStartInspectionModal(asset)}
+                            className="text-[11.5px] font-semibold py-1.5 px-3 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 cursor-pointer transition-opacity"
+                          >
+                            Auditar
+                          </button>
+                        ) : (
+                          <span className="text-[11px] font-semibold py-1 px-2 rounded-lg bg-[var(--surface-2)] text-[var(--ink-faint)] border border-[var(--border)]">
+                            Solo Lectura
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -656,12 +665,17 @@ export const DashboardPage: React.FC = () => {
               </div>
             )}
 
-            <Input
-              label="Nombre del Bioingeniero / Inspector Técnico"
-              value={inspectorName}
-              onChangeText={setInspectorName}
-              placeholder="Ej: Bioing. Santiago"
-            />
+            <div className="p-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl flex items-center justify-between text-xs">
+              <div>
+                <span className="text-[var(--ink-faint)] font-medium">Inspector a cargo:</span>
+                <p className="font-bold text-[var(--ink)] m-0 mt-0.5">{user?.full_name}</p>
+              </div>
+              {user?.professional_license && (
+                <span className="font-mono text-[11px] text-[var(--ink-soft)] bg-[var(--surface)] px-2 py-0.5 rounded border border-[var(--border)]">
+                  Mat: {user.professional_license}
+                </span>
+              )}
+            </div>
 
             <Input
               label="Notas Preliminares (Opcional)"

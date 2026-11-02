@@ -9,10 +9,12 @@ import {
   Clock,
   Play,
   X,
+  VolumeX,
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { apiService } from '../services/api';
 import { useAlerts } from '../context/AlertsContext';
+import { usePermission } from '../hooks/usePermission';
 import { AlertCard } from '../components/alerts/AlertCard';
 import {
   AlertActionsDialog,
@@ -34,6 +36,7 @@ type StatusFilter = 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED' | 'ALL';
 export const AlertsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { summary, refresh: refreshGlobalSummary, onAlertEvent } = useAlerts();
+  const { can } = usePermission();
 
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
@@ -43,58 +46,61 @@ export const AlertsPage: React.FC = () => {
 
   // Filtros
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('OPEN');
-  const [selectedSeverities, setSelectedSeverities] = useState<AlertSeverity[]>([]);
+  const [selectedSeverities, setSelectedSeverities] = useState<AlertSeverity[]>([
+    'CRITICAL',
+    'HIGH',
+    'MEDIUM',
+    'LOW',
+    'INFO',
+  ]);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [includeProvisional, setIncludeProvisional] = useState<boolean>(true);
 
   // Selección múltiple
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
-  // Modal de acción (ack/resolve/silence)
-  const [actionModalOpen, setActionModalOpen] = useState<boolean>(false);
+  // Modal de acción
   const [actionAlert, setActionAlert] = useState<Alert | null>(null);
   const [actionType, setActionType] = useState<AlertActionType>('acknowledge');
+  const [actionModalOpen, setActionModalOpen] = useState<boolean>(false);
 
-  // Detalle de alerta (deep link o click)
-  const [detailModalOpen, setDetailModalOpen] = useState<boolean>(false);
+  // Modal de detalle
   const [detailAlert, setDetailAlert] = useState<AlertDetail | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState<boolean>(false);
   const [loadingDetail, setLoadingDetail] = useState<boolean>(false);
 
   const loadAlerts = useCallback(async () => {
     try {
       setLoading(true);
+      const statuses =
+        statusFilter === 'ALL'
+          ? undefined
+          : statusFilter === 'OPEN'
+          ? ['OPEN', 'ACKNOWLEDGED']
+          : [statusFilter];
 
-      const params: Record<string, any> = {
+      const res = await apiService.getAlerts({
+        status: statuses,
+        severity: selectedSeverities.length === 5 ? undefined : selectedSeverities,
+        include_provisional: includeProvisional,
+        q: searchQuery.trim() || undefined,
         limit: 100,
         sort: '-last_detected_at',
-        include_provisional: includeProvisional,
-      };
+      });
 
-      if (statusFilter !== 'ALL') {
-        params.status = statusFilter;
-      }
-      if (selectedSeverities.length > 0) {
-        params.severity = selectedSeverities.join(',');
-      }
-      if (searchQuery.trim()) {
-        params.q = searchQuery.trim();
-      }
-
-      const res = await apiService.getAlerts(params);
       setAlerts(res.items);
       setTotalCount(res.total);
     } catch (err) {
-      console.error('Error al cargar listado de alertas:', err);
+      console.error('Error cargando alertas:', err);
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, selectedSeverities, searchQuery, includeProvisional]);
+  }, [statusFilter, selectedSeverities, includeProvisional, searchQuery]);
 
-  // Cargar alerta por ID para deep link o inspección profunda
-  const loadDetailById = useCallback(async (alertId: number) => {
+  const loadDetailById = useCallback(async (id: number) => {
     try {
       setLoadingDetail(true);
-      const detail = await apiService.getAlert(alertId);
+      const detail = await apiService.getAlert(id);
       setDetailAlert(detail);
       setDetailModalOpen(true);
     } catch (err) {
@@ -115,41 +121,49 @@ export const AlertsPage: React.FC = () => {
     }
   }, [searchParams, loadDetailById]);
 
-  // Escuchar stream SSE para refrescar en vivo
-  useEffect(() => {
-    const unsubscribe = onAlertEvent(() => {
-      loadAlerts();
-    });
-    return unsubscribe;
-  }, [onAlertEvent, loadAlerts]);
-
+  // Carga inicial y reactiva
   useEffect(() => {
     loadAlerts();
   }, [loadAlerts]);
 
-  // Disparar barrido programado manual
+  // Escuchar eventos en vivo SSE
+  useEffect(() => {
+    const unsub = onAlertEvent((event) => {
+      if (
+        event.event === 'alert.raised' ||
+        event.event === 'alert.updated' ||
+        event.event === 'alert.resolved' ||
+        event.event === 'alert.escalated'
+      ) {
+        loadAlerts();
+      }
+    });
+    return unsub;
+  }, [onAlertEvent, loadAlerts]);
+
+  // Ejecución de barrido manual
   const handleRunChecks = async () => {
     try {
       setRunningChecks(true);
-      const results = await apiService.runAlertChecks();
+      const result = await apiService.runAlertChecks();
+      const raised = result.raised_count ?? 0;
+      const resolved = result.resolved_count ?? 0;
       await Promise.all([loadAlerts(), refreshGlobalSummary()]);
-      const totalCreated = Object.values(results).reduce((a, b) => a + b, 0);
-      alert(`Barrido ejecutado con éxito. Alertas procesadas: ${totalCreated}`);
+      alert(`Barrido completado exitosamente: ${raised} desvíos detectados, ${resolved} normalizados.`);
     } catch (err) {
-      console.error('Error ejecutando barrido programado:', err);
+      console.error('Error en barrido manual:', err);
       alert('Error ejecutando el barrido programado de reglas.');
     } finally {
       setRunningChecks(false);
     }
   };
 
-  // Reconocimiento masivo
+  // Reconocimiento masivo (OE-6: identidad tomada del token)
   const handleBulkAcknowledge = async () => {
     if (selectedIds.size === 0) return;
-    const actor = localStorage.getItem('gmao.inspectorName') || 'Bioing. Santiago';
     try {
       setBulkAcking(true);
-      await apiService.bulkAcknowledgeAlerts(Array.from(selectedIds), actor);
+      await apiService.bulkAcknowledgeAlerts(Array.from(selectedIds));
       setSelectedIds(new Set());
       await Promise.all([loadAlerts(), refreshGlobalSummary()]);
     } catch (err) {
@@ -160,27 +174,24 @@ export const AlertsPage: React.FC = () => {
     }
   };
 
-  // Ejecución de acción individual
+  // Ejecución de acción individual (OE-6: identidad tomada del token)
   const handleConfirmAction = async (payload: {
     alertId: number;
     action: AlertActionType;
-    actor: string;
+    actor?: string;
     note?: string;
     until?: string;
   }) => {
     if (payload.action === 'acknowledge') {
       await apiService.acknowledgeAlert(payload.alertId, {
-        actor: payload.actor,
         note: payload.note,
       });
     } else if (payload.action === 'resolve') {
       await apiService.resolveAlert(payload.alertId, {
-        actor: payload.actor,
         note: payload.note || '',
       });
     } else if (payload.action === 'silence') {
       await apiService.silenceAlert(payload.alertId, {
-        actor: payload.actor,
         until: payload.until || '',
         note: payload.note,
       });
@@ -215,7 +226,7 @@ export const AlertsPage: React.FC = () => {
   }, [alerts, selectedIds]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 select-none">
       {/* Encabezado y Acciones Rápidas */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--border)]">
         <div>
@@ -229,14 +240,16 @@ export const AlertsPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            title="Barrido Programado"
-            variant="outline"
-            size="sm"
-            icon={<Play className="w-4 h-4 text-[var(--accent)]" />}
-            onClick={handleRunChecks}
-            loading={runningChecks}
-          />
+          {can('alerts:run_checks') && (
+            <Button
+              title="Barrido Programado"
+              variant="outline"
+              size="sm"
+              icon={<Play className="w-4 h-4 text-[var(--accent)]" />}
+              onClick={handleRunChecks}
+              loading={runningChecks}
+            />
+          )}
           <Button
             title="Refrescar"
             variant="secondary"
@@ -273,67 +286,61 @@ export const AlertsPage: React.FC = () => {
           <div className="text-2xl font-black text-[var(--danger)] mt-1">
             {summary?.unacknowledged_critical ?? '—'}
           </div>
-          <span className="text-[10.5px] text-[var(--danger)]/80 mt-1">
-            Riesgo operativo alto
+          <span className="text-[10.5px] text-[var(--danger)]/80 mt-1 font-semibold">
+            Riesgo operativo inmediato
           </span>
         </Card>
 
         <Card className="p-3.5 flex flex-col justify-between">
           <span className="text-[11px] font-bold text-[var(--ink-faint)] uppercase tracking-wider">
-            Estado de Red
+            MTTA (Reconocimiento)
           </span>
-          <div className="text-lg font-bold text-[var(--ink)] mt-1 flex items-center gap-2">
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                summary?.health === 'CRITICAL'
-                  ? 'bg-[var(--danger)] animate-pulse'
-                  : summary?.health === 'DEGRADED'
-                  ? 'bg-[var(--warn)]'
-                  : 'bg-[var(--ok)]'
-              }`}
-            />
-            <span>{summary?.health || 'OK'}</span>
+          <div className="text-2xl font-black text-[var(--ink)] mt-1">
+            {summary?.mtta_minutes !== null && summary?.mtta_minutes !== undefined
+              ? `${Math.round(summary.mtta_minutes)}m`
+              : '—'}
           </div>
           <span className="text-[10.5px] text-[var(--ink-soft)] mt-1">
-            Conexión en tiempo real
+            Tiempo medio de respuesta
           </span>
         </Card>
 
         <Card className="p-3.5 flex flex-col justify-between">
           <span className="text-[11px] font-bold text-[var(--ink-faint)] uppercase tracking-wider">
-            MTTA / MTTR (30d)
+            MTTR (Resolución)
           </span>
-          <div className="text-base font-bold text-[var(--ink)] mt-1">
-            {summary?.mtta_minutes != null ? `${summary.mtta_minutes}m` : '—'} /{' '}
-            {summary?.mttr_minutes != null ? `${summary.mttr_minutes}m` : '—'}
+          <div className="text-2xl font-black text-[var(--ink)] mt-1">
+            {summary?.mttr_minutes !== null && summary?.mttr_minutes !== undefined
+              ? `${Math.round(summary.mttr_minutes)}m`
+              : '—'}
           </div>
           <span className="text-[10.5px] text-[var(--ink-soft)] mt-1">
-            Reconocimiento / Resolución
+            Tiempo medio de mitigación
           </span>
         </Card>
       </div>
 
-      {/* Barra de Filtros */}
-      <div className="flex flex-col gap-3 p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Segmented Control de Estados */}
-          <div className="inline-flex p-1 bg-[var(--surface-2)] rounded-xl border border-[var(--border)] overflow-x-auto">
+      {/* Barra de Filtros Multifacéticos */}
+      <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xs flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+          {/* Tabs de Estado */}
+          <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-thin">
             {(
               [
-                { id: 'OPEN', label: 'Abiertas' },
-                { id: 'ACKNOWLEDGED', label: 'Reconocidas' },
-                { id: 'RESOLVED', label: 'Resueltas' },
-                { id: 'ALL', label: 'Todas' },
+                { label: 'Abiertas', value: 'OPEN' },
+                { label: 'Reconocidas', value: 'ACKNOWLEDGED' },
+                { label: 'Resueltas', value: 'RESOLVED' },
+                { label: 'Todas', value: 'ALL' },
               ] as const
             ).map((st) => (
               <button
-                key={st.id}
+                key={st.value}
                 type="button"
-                onClick={() => setStatusFilter(st.id)}
-                className={`py-1.5 px-3 text-xs font-bold rounded-lg cursor-pointer transition-all select-none whitespace-nowrap ${
-                  statusFilter === st.id
-                    ? 'bg-[var(--surface)] text-[var(--ink)] shadow-xs'
-                    : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
+                onClick={() => setStatusFilter(st.value)}
+                className={`py-1.5 px-3 rounded-lg text-xs font-bold border transition-all cursor-pointer whitespace-nowrap ${
+                  statusFilter === st.value
+                    ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-xs'
+                    : 'bg-[var(--surface-2)] text-[var(--ink-soft)] border-[var(--border)] hover:bg-[var(--border)]'
                 }`}
               >
                 {st.label}
@@ -341,8 +348,8 @@ export const AlertsPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Búsqueda libre */}
-          <div className="relative min-w-[240px] max-w-sm w-full">
+          {/* Búsqueda en Vivo */}
+          <div className="relative flex-1 max-w-xs">
             <Search className="w-4 h-4 text-[var(--ink-faint)] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -391,8 +398,8 @@ export const AlertsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Barra de Acciones Masivas */}
-      {selectedIds.size > 0 && (
+      {/* Barra de Acciones Masivas (solo visible si tiene permiso para reconocer) */}
+      {can('alerts:acknowledge') && selectedIds.size > 0 && (
         <div className="p-3 rounded-xl bg-[var(--accent-soft)] border border-[var(--accent)]/30 flex items-center justify-between gap-3 animate-in fade-in">
           <div className="flex items-center gap-2 text-xs font-bold text-[var(--accent-strong)]">
             <span>{selectedIds.size} alertas seleccionadas</span>
@@ -411,32 +418,37 @@ export const AlertsPage: React.FC = () => {
 
       {/* Control Seleccionar Todas y Conteo */}
       <div className="flex items-center justify-between text-xs text-[var(--ink-soft)] px-1">
-        <label className="flex items-center gap-2 font-medium cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={allActiveSelected}
-            onChange={(e) => handleSelectAll(e.target.checked)}
-            className="w-4 h-4 rounded border-[var(--border)] text-[var(--accent)] focus:ring-[var(--accent)]"
-          />
-          <span>Seleccionar todas las alertas activas</span>
-        </label>
-
-        <span>Mostrando {alerts.length} de {totalCount} alertas</span>
+        {can('alerts:acknowledge') && (
+          <label className="flex items-center gap-2 font-medium cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={allActiveSelected}
+              onChange={(e) => handleSelectAll(e.target.checked)}
+              className="w-4 h-4 rounded border-[var(--border)] text-[var(--accent)] focus:ring-[var(--accent)]"
+            />
+            <span>Seleccionar todas las activas</span>
+          </label>
+        )}
+        <span className="ml-auto font-semibold">
+          Total listadas: {totalCount}
+        </span>
       </div>
 
       {/* Lista de Alertas */}
       {loading ? (
-        <div className="p-12 text-center flex flex-col items-center justify-center gap-3">
+        <div className="p-16 flex flex-col items-center justify-center gap-3">
           <div className="w-8 h-8 border-3 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs font-semibold text-[var(--ink-soft)]">
-            Cargando desvíos normativos y auditorías...
-          </p>
+          <span className="text-xs font-medium text-[var(--ink-soft)]">
+            Cargando desvíos normativos y notificaciones...
+          </span>
         </div>
       ) : alerts.length === 0 ? (
-        <Card className="p-12 text-center flex flex-col items-center justify-center gap-3 bg-[var(--surface)] border border-[var(--border)]">
-          <ShieldCheck className="w-12 h-12 text-[var(--ok)]" />
+        <Card className="p-12 text-center flex flex-col items-center justify-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-[var(--ok-soft)] text-[var(--ok)] flex items-center justify-center">
+            <ShieldCheck className="w-6 h-6" />
+          </div>
           <h3 className="text-base font-bold text-[var(--ink)] m-0">
-            Sin alertas registradas en este criterio
+            Sin Alertas para los Filtros Actuales
           </h3>
           <p className="text-xs sm:text-sm text-[var(--ink-soft)] max-w-md m-0">
             La red hospitalaria opera dentro de los márgenes normativos de seguridad clínica y no presenta desvíos pendientes de corrección.
@@ -449,29 +461,45 @@ export const AlertsPage: React.FC = () => {
               key={alert.id}
               alert={alert}
               selected={selectedIds.has(alert.id)}
-              onSelect={(checked) => {
-                setSelectedIds((prev) => {
-                  const next = new Set(prev);
-                  if (checked) next.add(alert.id);
-                  else next.delete(alert.id);
-                  return next;
-                });
-              }}
-              onAcknowledge={(a) => {
-                setActionAlert(a);
-                setActionType('acknowledge');
-                setActionModalOpen(true);
-              }}
-              onResolve={(a) => {
-                setActionAlert(a);
-                setActionType('resolve');
-                setActionModalOpen(true);
-              }}
-              onSilence={(a) => {
-                setActionAlert(a);
-                setActionType('silence');
-                setActionModalOpen(true);
-              }}
+              onSelect={
+                can('alerts:acknowledge')
+                  ? (checked) => {
+                      setSelectedIds((prev) => {
+                        const next = new Set(prev);
+                        if (checked) next.add(alert.id);
+                        else next.delete(alert.id);
+                        return next;
+                      });
+                    }
+                  : undefined
+              }
+              onAcknowledge={
+                can('alerts:acknowledge')
+                  ? (a) => {
+                      setActionAlert(a);
+                      setActionType('acknowledge');
+                      setActionModalOpen(true);
+                    }
+                  : undefined
+              }
+              onResolve={
+                can('alerts:resolve')
+                  ? (a) => {
+                      setActionAlert(a);
+                      setActionType('resolve');
+                      setActionModalOpen(true);
+                    }
+                  : undefined
+              }
+              onSilence={
+                can('alerts:silence')
+                  ? (a) => {
+                      setActionAlert(a);
+                      setActionType('silence');
+                      setActionModalOpen(true);
+                    }
+                  : undefined
+              }
               onViewDetail={(a) => {
                 loadDetailById(a.id);
                 setSearchParams({ id: String(a.id) });
@@ -481,7 +509,7 @@ export const AlertsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Modal de Acciones (Acknowledge / Resolve / Silence) */}
+      {/* Modal de Acción (Reconocer / Resolver / Silenciar) */}
       <AlertActionsDialog
         open={actionModalOpen}
         onOpenChange={setActionModalOpen}
@@ -490,37 +518,24 @@ export const AlertsPage: React.FC = () => {
         onConfirm={handleConfirmAction}
       />
 
-      {/* Modal / Panel de Detalle de Alerta */}
+      {/* Modal de Detalle Completo de la Alerta */}
       <Dialog.Root
         open={detailModalOpen}
         onOpenChange={(open) => {
           setDetailModalOpen(open);
           if (!open) {
-            setSearchParams({});
+            searchParams.delete('id');
+            setSearchParams(searchParams);
           }
         }}
       >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 animate-in fade-in" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-[var(--surface)] text-[var(--ink)] rounded-2xl shadow-2xl border border-[var(--border)] p-6 z-50 flex flex-col gap-5">
-            <div className="flex justify-between items-start pb-3 border-b border-[var(--border)]">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  {detailAlert && (
-                    <>
-                      <AlertSeverityBadge severity={detailAlert.severity} size="sm" />
-                      <AlertStatusBadge status={detailAlert.status} size="sm" />
-                      <span className="font-mono text-xs font-bold text-[var(--accent)]">
-                        {detailAlert.rule_code}
-                      </span>
-                    </>
-                  )}
-                </div>
-                <Dialog.Title className="text-base sm:text-lg font-bold text-[var(--ink)] m-0">
-                  {detailAlert?.title || 'Detalle de Alerta'}
-                </Dialog.Title>
-              </div>
-
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-[var(--surface)] text-[var(--ink)] rounded-2xl shadow-2xl border border-[var(--border)] p-6 z-50 flex flex-col gap-4">
+            <div className="flex justify-between items-center pb-2 border-b border-[var(--border)]">
+              <Dialog.Title className="text-base font-bold text-[var(--ink)] m-0">
+                Auditoría y Trazabilidad del Desvío
+              </Dialog.Title>
               <Dialog.Close asChild>
                 <button
                   type="button"
@@ -532,22 +547,34 @@ export const AlertsPage: React.FC = () => {
             </div>
 
             {loadingDetail || !detailAlert ? (
-              <div className="p-8 text-center flex flex-col items-center justify-center gap-2">
-                <div className="w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
-                <span className="text-xs text-[var(--ink-soft)]">Cargando bitácora completa...</span>
+              <div className="p-12 text-center text-xs text-[var(--ink-soft)]">
+                Cargando datos completos de la bitácora...
               </div>
             ) : (
-              <div className="flex flex-col gap-5">
-                {/* Mensaje y Parámetros */}
-                <div className="p-4 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] flex flex-col gap-3 text-xs">
-                  <p className="text-[var(--ink)] leading-relaxed m-0">{detailAlert.message}</p>
+              <div className="flex flex-col gap-4">
+                {/* Resumen */}
+                <div className="p-4 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs font-bold text-[var(--accent)]">
+                      {detailAlert.rule_code}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <AlertSeverityBadge severity={detailAlert.severity} size="sm" />
+                      <AlertStatusBadge status={detailAlert.status} size="sm" />
+                    </div>
+                  </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-[var(--border)]">
+                  <h4 className="text-sm font-bold text-[var(--ink)] m-0">{detailAlert.title}</h4>
+                  <p className="text-xs text-[var(--ink-soft)] m-0 leading-relaxed">
+                    {detailAlert.message}
+                  </p>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-[var(--border)] text-xs">
                     <div>
                       <span className="text-[10px] font-bold text-[var(--ink-faint)] block uppercase">
                         Activo
                       </span>
-                      <span className="font-bold text-[var(--ink)]">
+                      <span className="font-semibold text-[var(--ink)]">
                         {detailAlert.asset_tag || '—'}
                       </span>
                     </div>
@@ -556,35 +583,17 @@ export const AlertsPage: React.FC = () => {
                       <span className="text-[10px] font-bold text-[var(--ink-faint)] block uppercase">
                         Sector
                       </span>
-                      <span className="font-bold text-[var(--ink)]">
+                      <span className="font-semibold text-[var(--ink)]">
                         {detailAlert.sector_name || '—'}
                       </span>
                     </div>
 
                     <div>
                       <span className="text-[10px] font-bold text-[var(--ink-faint)] block uppercase">
-                        Norma de Referencia
+                        Norma Ref.
                       </span>
-                      <span className="font-bold text-[var(--ok)]">
-                        {detailAlert.normative_ref || '—'}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold text-[var(--ink-faint)] block uppercase">
-                        Valor Esperado
-                      </span>
-                      <span className="font-bold text-[var(--ink)]">
-                        {detailAlert.expected_value || '—'}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold text-[var(--ink-faint)] block uppercase">
-                        Valor Registrado
-                      </span>
-                      <span className="font-bold text-[var(--danger)]">
-                        {detailAlert.actual_value || '—'}
+                      <span className="font-semibold text-[var(--ink)]">
+                        {detailAlert.normative_ref || 'ISO 7396-1'}
                       </span>
                     </div>
 
@@ -606,7 +615,7 @@ export const AlertsPage: React.FC = () => {
                 <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border)]">
                   {(detailAlert.status === 'OPEN' || detailAlert.status === 'ACKNOWLEDGED') && (
                     <>
-                      {detailAlert.status === 'OPEN' && (
+                      {detailAlert.status === 'OPEN' && can('alerts:acknowledge') && (
                         <Button
                           title="Reconocer"
                           variant="secondary"
@@ -619,17 +628,32 @@ export const AlertsPage: React.FC = () => {
                           }}
                         />
                       )}
-                      <Button
-                        title="Resolver"
-                        variant="success"
-                        size="sm"
-                        icon={<CheckCircle className="w-4 h-4" />}
-                        onClick={() => {
-                          setActionAlert(detailAlert);
-                          setActionType('resolve');
-                          setActionModalOpen(true);
-                        }}
-                      />
+                      {can('alerts:silence') && (
+                        <Button
+                          title="Silenciar"
+                          variant="secondary"
+                          size="sm"
+                          icon={<VolumeX className="w-4 h-4 text-[var(--ink-soft)]" />}
+                          onClick={() => {
+                            setActionAlert(detailAlert);
+                            setActionType('silence');
+                            setActionModalOpen(true);
+                          }}
+                        />
+                      )}
+                      {can('alerts:resolve') && (
+                        <Button
+                          title="Resolver"
+                          variant="success"
+                          size="sm"
+                          icon={<CheckCircle className="w-4 h-4" />}
+                          onClick={() => {
+                            setActionAlert(detailAlert);
+                            setActionType('resolve');
+                            setActionModalOpen(true);
+                          }}
+                        />
+                      )}
                     </>
                   )}
                 </div>

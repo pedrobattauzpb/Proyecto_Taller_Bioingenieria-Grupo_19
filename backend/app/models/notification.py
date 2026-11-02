@@ -92,8 +92,10 @@ class Alert(Base):
     last_detected_at = Column(DateTime, nullable=False, default=utc_now_naive)
     acknowledged_at = Column(DateTime, nullable=True)
     acknowledged_by = Column(String(255), nullable=True)
+    acknowledged_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     resolved_at = Column(DateTime, nullable=True)
     resolved_by = Column(String(255), nullable=True)
+    resolved_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     resolution_note = Column(Text, nullable=True)
     escalation_level = Column(Integer, nullable=False, default=0)
     last_escalated_at = Column(DateTime, nullable=True)
@@ -109,6 +111,8 @@ class Alert(Base):
     item = relationship("ChecklistItem", lazy="select")
     template = relationship("ChecklistTemplate", lazy="select")
     deliveries = relationship("NotificationDelivery", back_populates="alert", cascade="all, delete-orphan")
+    acknowledged_by_user = relationship("User", foreign_keys=[acknowledged_by_id])
+    resolved_by_user = relationship("User", foreign_keys=[resolved_by_id])
 
 
 class NotificationChannel(Base):

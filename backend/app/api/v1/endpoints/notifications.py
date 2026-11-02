@@ -3,9 +3,16 @@ from datetime import datetime, timezone
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, and_, or_
 
 from app.core.database import get_db
+from app.core.permissions import Permission
+from app.api.deps import require_permissions, get_current_active_user
+from app.services.access_control import (
+    assert_hospital_in_scope,
+    scope_filter_hospital_ids,
+)
+from app.models.user import User
 from app.models.notification import (
     NotificationChannel,
     AlertRule,
@@ -32,7 +39,7 @@ from app.services.notifications.channels.webhook import webhook_backend
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_permissions(Permission.NOTIFICATIONS_MANAGE))])
 
 
 def _channel_to_read(c: NotificationChannel) -> NotificationChannelRead:
@@ -53,8 +60,19 @@ def _channel_to_read(c: NotificationChannel) -> NotificationChannelRead:
 # --- CANALES ---
 
 @router.get("/channels", response_model=List[NotificationChannelRead], summary="Listado de canales de notificación")
-async def list_channels(db: AsyncSession = Depends(get_db)):
+async def list_channels(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     stmt = select(NotificationChannel).order_by(NotificationChannel.id.asc())
+    allowed_ids = scope_filter_hospital_ids(current_user)
+    if allowed_ids is not None:
+        stmt = stmt.where(
+            or_(
+                NotificationChannel.hospital_id.in_(allowed_ids),
+                NotificationChannel.hospital_id.is_(None),
+            )
+        )
     res = await db.execute(stmt)
     channels = res.scalars().all()
     return [_channel_to_read(c) for c in channels]
@@ -64,7 +82,11 @@ async def list_channels(db: AsyncSession = Depends(get_db)):
 async def create_channel(
     body: NotificationChannelCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
+    if body.hospital_id is not None:
+        assert_hospital_in_scope(current_user, body.hospital_id)
+
     channel = NotificationChannel(
         name=body.name,
         channel_type=body.channel_type,
@@ -87,12 +109,18 @@ async def update_channel(
     id: int,
     body: NotificationChannelUpdate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     stmt = select(NotificationChannel).where(NotificationChannel.id == id)
     res = await db.execute(stmt)
     channel = res.scalars().first()
     if not channel:
         raise HTTPException(status_code=404, detail="Canal no encontrado")
+
+    if channel.hospital_id is not None:
+        assert_hospital_in_scope(current_user, channel.hospital_id)
+    if body.hospital_id is not None:
+        assert_hospital_in_scope(current_user, body.hospital_id)
 
     update_data = body.model_dump(exclude_unset=True)
     for field, val in update_data.items():
@@ -104,12 +132,19 @@ async def update_channel(
 
 
 @router.delete("/channels/{id}", status_code=status.HTTP_204_NO_CONTENT, summary="Eliminar un canal")
-async def delete_channel(id: int, db: AsyncSession = Depends(get_db)):
+async def delete_channel(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     stmt = select(NotificationChannel).where(NotificationChannel.id == id)
     res = await db.execute(stmt)
     channel = res.scalars().first()
     if not channel:
         raise HTTPException(status_code=404, detail="Canal no encontrado")
+
+    if channel.hospital_id is not None:
+        assert_hospital_in_scope(current_user, channel.hospital_id)
 
     await db.delete(channel)
     await db.commit()
@@ -117,12 +152,19 @@ async def delete_channel(id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/channels/{id}/test", response_model=NotificationDeliveryRead, summary="Probar entrega en un canal")
-async def test_channel(id: int, db: AsyncSession = Depends(get_db)):
+async def test_channel(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     stmt = select(NotificationChannel).where(NotificationChannel.id == id)
     res = await db.execute(stmt)
     channel = res.scalars().first()
     if not channel:
         raise HTTPException(status_code=404, detail="Canal no encontrado")
+
+    if channel.hospital_id is not None:
+        assert_hospital_in_scope(current_user, channel.hospital_id)
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -141,7 +183,7 @@ async def test_channel(id: int, db: AsyncSession = Depends(get_db)):
         first_detected_at=now,
         last_detected_at=now,
         resolved_at=now,
-        resolved_by="SYSTEM",
+        resolved_by=current_user.full_name or current_user.username,
         created_at=now,
         updated_at=now,
     )
@@ -268,6 +310,7 @@ async def list_deliveries(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     conditions = []
     if alert_id:
@@ -277,8 +320,18 @@ async def list_deliveries(
     if channel_type:
         conditions.append(NotificationDelivery.channel_type == channel_type)
 
+    allowed_ids = scope_filter_hospital_ids(current_user)
+    if allowed_ids is not None:
+        conditions.append(
+            or_(
+                Alert.hospital_id.in_(allowed_ids),
+                Alert.hospital_id.is_(None),
+            )
+        )
+
     stmt = (
         select(NotificationDelivery)
+        .join(Alert, NotificationDelivery.alert_id == Alert.id, isouter=True)
         .where(and_(*conditions) if conditions else True)
         .order_by(desc(NotificationDelivery.created_at))
         .offset(offset)

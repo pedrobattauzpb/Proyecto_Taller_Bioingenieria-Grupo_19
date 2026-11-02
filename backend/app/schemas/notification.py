@@ -55,8 +55,10 @@ class AlertRead(BaseModel):
     last_detected_at: datetime
     acknowledged_at: Optional[datetime] = None
     acknowledged_by: Optional[str] = None
+    acknowledged_by_id: Optional[int] = None
     resolved_at: Optional[datetime] = None
     resolved_by: Optional[str] = None
+    resolved_by_id: Optional[int] = None
     resolution_note: Optional[str] = None
     escalation_level: int
     last_escalated_at: Optional[datetime] = None
@@ -98,24 +100,24 @@ class AlertSummary(BaseModel):
 
 
 class AlertAcknowledgeRequest(BaseModel):
-    actor: str = Field(..., min_length=1)
+    actor: Optional[str] = None  # Deprecado en OE-6; se toma del token
     note: Optional[str] = None
 
 
 class AlertResolveRequest(BaseModel):
-    actor: str = Field(..., min_length=1)
+    actor: Optional[str] = None  # Deprecado en OE-6; se toma del token
     note: Optional[str] = None
 
 
 class AlertSilenceRequest(BaseModel):
-    actor: str = Field(..., min_length=1)
+    actor: Optional[str] = None  # Deprecado en OE-6; se toma del token
     until: datetime
     note: Optional[str] = None
 
 
 class AlertBulkAckRequest(BaseModel):
     ids: List[int]
-    actor: str = Field(..., min_length=1)
+    actor: Optional[str] = None  # Deprecado en OE-6; se toma del token
 
 
 class NotificationChannelCreate(BaseModel):
@@ -135,7 +137,6 @@ class NotificationChannelCreate(BaseModel):
         ch_type = values.get("channel_type")
         v = v.strip()
         if ch_type == ChannelType.EMAIL:
-            # Validación sencilla de formato de correo
             email_regex = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
             if not re.match(email_regex, v):
                 raise ValueError("Dirección de correo electrónico inválida")

@@ -18,8 +18,10 @@ class InspectionEvidence(Base):
     storage_url = Column(String(500), nullable=False)
     file_size_bytes = Column(Integer, nullable=True)
     uploaded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    uploaded_by = Column(String(255), nullable=True)  # Texto libre provisional (nombre/matrícula); se reemplazará por FK a Users en Objetivo 6 (Autenticación y Roles)
+    uploaded_by = Column(String(255), nullable=True)  # Snapshot textual (nombre/matrícula)
+    uploaded_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # Relaciones
     inspection = relationship("Inspection", back_populates="evidences")
     item = relationship("ChecklistItem")
+    uploaded_by_user = relationship("User", foreign_keys=[uploaded_by_id])

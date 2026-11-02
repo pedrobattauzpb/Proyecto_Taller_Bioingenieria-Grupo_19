@@ -10,6 +10,11 @@ from app.services.notifications import alert_scheduler
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Verificación crítica de seguridad para producción
+    if settings.ENVIRONMENT == "production":
+        if not settings.SECRET_KEY or settings.SECRET_KEY == "dev-insecure-change-me":
+            raise RuntimeError("FATAL: SECRET_KEY insecure in production environment")
+
     # En desarrollo local o SQLite, crear tablas automáticamente si no existen
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -27,7 +32,6 @@ async def lifespan(app: FastAPI):
             await alert_scheduler.stop()
 
 
-
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Backend API para el Protocolo de Inspección Digital de Gases Medicinales (Res. MSAL 1130/2000 e ISO 7396-1)",
@@ -35,7 +39,7 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url=f"{settings.API_V1_STR}/docs",
     redoc_url=f"{settings.API_V1_STR}/redoc",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Configuración de CORS para clientes Web y Móvil
@@ -45,7 +49,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
@@ -56,7 +60,7 @@ async def root():
     return {
         "status": "online",
         "service": settings.PROJECT_NAME,
-        "docs_url": f"{settings.API_V1_STR}/docs"
+        "docs_url": f"{settings.API_V1_STR}/docs",
     }
 
 
@@ -65,5 +69,5 @@ async def health_check():
     return {
         "status": "healthy",
         "environment": settings.ENVIRONMENT,
-        "debug": settings.DEBUG
+        "debug": settings.DEBUG,
     }

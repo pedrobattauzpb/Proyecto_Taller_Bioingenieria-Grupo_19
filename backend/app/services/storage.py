@@ -136,7 +136,7 @@ class StorageService:
     ) -> str:
         """
         Genera una URL prefirmada temporal para visualización clínica segura.
-        Si está en modo local o MinIO no responde, retorna la ruta de streaming de la API.
+        Si está en modo local o MinIO no responde, retorna la ruta firmada HMAC de la API.
         """
         ttl = expires_in or settings.PRESIGNED_URL_EXPIRATION_SECONDS
 
@@ -151,8 +151,12 @@ class StorageService:
             except Exception as e:
                 logger.warning(f"Error generando URL prefirmada en S3/MinIO: {e}")
 
-        # Fallback para visualización local
-        return f"{settings.API_V1_STR}/evidence/file/{storage_key}"
+        # Fallback para visualización local: URL firmada con HMAC y tiempo de expiración
+        from app.core.security import sign_file_url
+        import time
+        exp = int(time.time()) + ttl
+        sig_query = sign_file_url(storage_key, exp=exp)
+        return f"{settings.API_V1_STR}/evidence/file/{storage_key}{sig_query}"
 
     def delete_file(self, storage_key: str) -> bool:
         """

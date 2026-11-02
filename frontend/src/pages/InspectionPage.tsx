@@ -34,6 +34,8 @@ import { EvidenceThumbnail } from '../components/checklist/EvidenceThumbnail';
 import { MediaUploader } from '../components/checklist/MediaUploader';
 import { ComponentHistoryTimeline } from '../components/history/ComponentHistoryTimeline';
 import { useAlerts } from '../context/AlertsContext';
+import { useAuth } from '../context/AuthContext';
+import { usePermission } from '../hooks/usePermission';
 import { AlertSeverityBadge } from '../components/alerts/AlertSeverityBadge';
 import type { Alert } from '../services/types';
 import { Bell } from 'lucide-react';
@@ -43,6 +45,8 @@ export const InspectionPage: React.FC = () => {
   const navigate = useNavigate();
   const inspectionId = parseInt(id || '0', 10);
   const { onAlertEvent } = useAlerts();
+  const { user } = useAuth();
+  const { can, hasRole } = usePermission();
 
   const [inspection, setInspection] = useState<InspectionDetail | null>(null);
   const [responsesMap, setResponsesMap] = useState<Record<number, Partial<InspectionResponse>>>({});
@@ -183,9 +187,22 @@ export const InspectionPage: React.FC = () => {
     }
   };
 
+  const isCompleted = inspection?.status === 'COMPLETED';
+  const isAuditor = hasRole('AUDITOR');
+  const isOwnInspection = Boolean(user?.id && inspection?.inspector_id === user.id);
+  const canExecuteAll = can('inspections:execute_all');
+  const canExecuteOwn = can('inspections:execute_own') && isOwnInspection;
+  const canExecute = !isCompleted && !isAuditor && (canExecuteAll || canExecuteOwn);
+
+  const canCompleteAll = can('inspections:complete_all');
+  const canCompleteOwn = can('inspections:complete_own') && isOwnInspection;
+  const canClose = !isCompleted && !isAuditor && (canCompleteAll || canCompleteOwn);
+
+  const isReadOnly = Boolean(isCompleted || !canExecute);
+
   const triggerAutoSave = useCallback(
     (currentMap: Record<number, Partial<InspectionResponse>>) => {
-      if (inspection?.status === 'COMPLETED') return;
+      if (isReadOnly) return;
 
       setSaveStatus('saving');
       if (debounceTimerRef.current) {
@@ -215,11 +232,11 @@ export const InspectionPage: React.FC = () => {
         }
       }, 700);
     },
-    [inspectionId, inspection?.status]
+    [inspectionId, isReadOnly]
   );
 
   const handleUpdateResponse = (itemId: number, updates: Partial<InspectionResponse>) => {
-    if (inspection?.status === 'COMPLETED') return;
+    if (isReadOnly) return;
 
     setResponsesMap((prev) => {
       const next = {
@@ -321,7 +338,6 @@ export const InspectionPage: React.FC = () => {
     );
   }
 
-  const isCompleted = inspection.status === 'COMPLETED';
   const totalItems = inspection.template?.items.length || 0;
   const answeredCount = Object.values(responsesMap).filter(
     (r) =>
@@ -352,8 +368,8 @@ export const InspectionPage: React.FC = () => {
                 </h3>
                 <Badge label={inspection.asset?.tag_code || 'TAG'} variant="slate" size="sm" />
                 <Badge
-                  label={isCompleted ? 'Finalizada' : 'En Curso'}
-                  variant={isCompleted ? 'emerald' : 'amber'}
+                  label={isCompleted ? 'Finalizada' : isReadOnly ? 'Solo Lectura' : 'En Curso'}
+                  variant={isCompleted ? 'emerald' : isReadOnly ? 'slate' : 'amber'}
                   size="sm"
                 />
                 <NormativeStatusIndicator templateId={inspection.template_id} />
@@ -388,7 +404,7 @@ export const InspectionPage: React.FC = () => {
               onClick={handleDownloadExcel}
               loading={downloadingExcel}
             />
-            {!isCompleted && (
+            {canClose && (
               <Button
                 title="Cerrar y Firmar"
                 variant="success"
@@ -523,7 +539,7 @@ export const InspectionPage: React.FC = () => {
             onUpdateResponse={handleUpdateResponse}
             onUploadEvidence={handleUploadEvidence}
             onDeleteEvidence={handleDeleteEvidence}
-            disabled={isCompleted}
+            disabled={isReadOnly}
           />
         ))}
       </div>
@@ -548,18 +564,18 @@ export const InspectionPage: React.FC = () => {
                   key={ev.id}
                   evidence={ev}
                   onDelete={handleDeleteEvidence}
-                  disabled={isCompleted}
+                  disabled={isReadOnly}
                 />
               ))}
           </div>
         )}
 
-        {!isCompleted && (
+        {!isReadOnly && (
           <div className="pt-1">
             <MediaUploader
               inspectionId={inspection.id}
               inspectorName={inspection.inspector_name}
-              disabled={isCompleted}
+              disabled={isReadOnly}
               onEvidenceUploaded={handleUploadEvidence}
             />
           </div>
@@ -570,7 +586,7 @@ export const InspectionPage: React.FC = () => {
       <ComplianceSummaryCard summary={complianceEvaluation} />
 
       {/* Botón Inferior para Cerrar y Firmar Inspección */}
-      {!isCompleted && (
+      {canClose && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-[var(--shadow)] transition-colors">
           <div className="flex flex-col gap-0.5 text-center sm:text-left">
             <span className="text-sm font-bold text-[var(--ink)]">

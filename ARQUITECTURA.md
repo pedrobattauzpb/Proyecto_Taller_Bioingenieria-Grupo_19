@@ -2,7 +2,7 @@
 
 > **Documento Maestro de Arquitectura y Especificación Técnica (SSOT)**  
 > *Diseñado como referencia integral para desarrolladores, bioingenieros y agentes de Inteligencia Artificial.*  
-> *Última actualización técnica: 11 de Octubre de 2026 — Objetivos 1, 2, 3, 4 y 5 completados.*
+> *Última actualización técnica: 1 de Noviembre de 2026 — Objetivos 1, 2, 3, 4, 5 y 6 completados.*
 
 ---
 
@@ -30,6 +30,7 @@ El proyecto es un **GMAO / CMMS (Gestión de Mantenimiento Asistido por Ordenado
 | **3** | Historial centralizado por componente con evidencia multimedia (fotos/videos) | ✅ Completado |
 | **4** | Motor de reportes con generación automática de informes estructurados | ✅ Completado |
 | **5** | Sistema de notificaciones capaz de emitir alertas frente a la detección de fallas o incumplimientos de la normativa (en vivo y programadas, multicanal In-App/SSE/Email/Webhook) | ✅ Completado |
+| **6** | Configurar una arquitectura de seguridad y roles que gestione los niveles de acceso y permisos diferenciados para técnicos, supervisores y auditores (autenticación JWT/Argon2id, RBAC, alcance multi-hospital, protección O+C y cloaking) | ✅ Completado |
 
 ---
 
@@ -307,6 +308,22 @@ sequenceDiagram
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Salud** | `GET` | `/` | — | `{ status, service, docs_url }` | Root de bienvenida. |
 | **Salud** | `GET` | `/health` | — | `{ status, env, debug }` | Liveness probe. |
+| **Autenticación** | `POST` | `/api/v1/auth/login` | `OAuth2PasswordRequestForm` | `LoginResponse` | Inicio de sesión, par de tokens (JWT access + refresh) y perfil. |
+| **Autenticación** | `POST` | `/api/v1/auth/refresh` | `RefreshTokenRequest` | `TokenPair` | Rotación de refresh token con detección de reuso. |
+| **Autenticación** | `POST` | `/api/v1/auth/logout` | `RefreshTokenRequest` | `{ detail }` | Cierre de sesión y revocación inmediata de refresh tokens. |
+| **Autenticación** | `GET` | `/api/v1/auth/me` | — | `CurrentUserRead` | Datos del usuario autenticado, permisos y hospitales asignados. |
+| **Autenticación** | `PUT` | `/api/v1/auth/me/password` | `PasswordChangeRequest` | `{ detail }` | Cambio de contraseña y revocación de sesiones previas. |
+| **Autenticación** | `POST` | `/api/v1/auth/stream-ticket` | — | `StreamTicketResponse` | Ticket temporal de 60s para conexión segura a SSE. |
+| **Usuarios** | `GET` | `/api/v1/users` | `q`, `role`, `is_active` | `List[UserRead]` | Listado de usuarios (filtrado por alcance). |
+| **Usuarios** | `POST` | `/api/v1/users` | `UserCreate` | `UserRead` | Creación de usuario (Supervisor: solo técnicos de su hospital). |
+| **Usuarios** | `GET` | `/api/v1/users/{id}` | Path | `UserRead` | Detalle de usuario. |
+| **Usuarios** | `PATCH` | `/api/v1/users/{id}` | `UserUpdate` | `UserRead` | Modificación de usuario. |
+| **Usuarios** | `POST` | `/api/v1/users/{id}/deactivate` | Path | `UserRead` | Baja lógica de usuario. |
+| **Usuarios** | `POST` | `/api/v1/users/{id}/activate` | Path | `UserRead` | Reactivación de usuario. |
+| **Usuarios** | `POST` | `/api/v1/users/{id}/reset-password` | Path | `PasswordResetResponse` | Generación de contraseña temporal de un solo uso. |
+| **Usuarios** | `POST` | `/api/v1/users/{id}/unlock` | Path | `UserRead` | Desbloqueo de cuenta tras lockout. |
+| **Usuarios** | `PUT` | `/api/v1/users/{id}/hospitals` | `UserHospitalsUpdate` | `UserRead` | Asignación de centros hospitalarios. |
+| **Roles** | `GET` | `/api/v1/roles` | — | `List[RoleInfo]` | Catálogo de roles y matriz de permisos RBAC. |
 | **Jerarquía** | `GET` | `/api/v1/hierarchy` | — | `HierarchyTreeResponse` | Árbol completo + métricas globales. |
 | **Jerarquía** | `POST` | `/api/v1/hierarchy/hospitals` | `HospitalCreate` | `HospitalRead` | Alta de Hospital. |
 | **Jerarquía** | `POST` | `/api/v1/hierarchy/sectors` | `SectorCreate` | `SectorRead` | Alta de Sector. |
@@ -532,8 +549,9 @@ flowchart LR
 | `test_objective_3.py` | Upload/validación de evidencia, timeline de activo, reglas de eliminación | OE-3 |
 | `test_objective_4.py` | Acta PDF/Excel de inspección (magic bytes, headers, 404), historial de activo en PDF, informe ejecutivo PDF/XLSX/JSON | OE-4 |
 | `test_objective_5.py` | Subsistema de alertas y notificaciones: deduplicación SHA-1, SSE, despachador multicanal, escalamiento, reglas programadas | OE-5 |
+| `test_objective_6.py` | Arquitectura de seguridad, roles RBAC (matriz parametrizada), reglas de objeto O+C, inmutabilidad, multi-hospital, auditoría de solo lectura, tickets SSE y URLs firmadas HMAC | OE-6 |
 
-**Resultado actual:** `42/42 tests passing` ✅
+**Resultado actual:** `145/145 tests passing` ✅
 
 ---
 
@@ -550,9 +568,10 @@ flowchart LR
 | `95c1f0327ee8` | Tablas de compliance: normative_references, normative_versions, compliance_results, audit_logs. |
 | `f228caf3e508` | Tabla components e inspection_evidences. |
 | `de86fd1fd98b` | Unificación de components dentro de assets, limpieza de FKs, uploaded_by como String. |
-| `e1a2b3c4d5e6` | **(HEAD)** Tablas de alertas y notificaciones (alerts, notification_channels, alert_rules, notification_deliveries), extensión de AuditEventType y columnas clínicas en assets y templates. |
+| `e1a2b3c4d5e6` | Tablas de alertas y notificaciones (alerts, notification_channels, alert_rules, notification_deliveries), extensión de AuditEventType y columnas clínicas en assets y templates. |
+| `f6a0b1c2d3e4` | **(HEAD)** Tablas de usuarios y seguridad (`users`, `refresh_tokens`, `user_hospitals`), claves foráneas de usuario en inspections, evidences, alerts y audit_logs, índices compuestos y ampliación de AuditEventType con 16 eventos de seguridad. |
 
-**17 tablas físicas:** `alembic_version`, `hospitals`, `sectors`, `assets`, `checklist_templates`, `checklist_items`, `inspections`, `inspection_responses`, `inspection_evidences`, `normative_references`, `normative_versions`, `compliance_results`, `audit_logs`, `alerts`, `notification_channels`, `alert_rules`, `notification_deliveries`.
+**20 tablas físicas:** `alembic_version`, `hospitals`, `sectors`, `assets`, `checklist_templates`, `checklist_items`, `inspections`, `inspection_responses`, `inspection_evidences`, `normative_references`, `normative_versions`, `compliance_results`, `audit_logs`, `alerts`, `notification_channels`, `alert_rules`, `notification_deliveries`, `users`, `refresh_tokens`, `user_hospitals`.
 
 ---
 
@@ -593,3 +612,8 @@ Cualquier IA o desarrollador que modifique o extienda este repositorio **DEBE** 
    * Componentes responsivos y ergonómicos para uso táctil en tablets/smartphones en campo, optimizados para Capacitor y navegadores de escritorio.
 8. **Tests de Integración:**
    * Cada nuevo módulo debe incluir tests con `pytest-asyncio` + `httpx.AsyncClient` sobre SQLite en memoria. Verificar que `pytest -v` pase al 100% antes de cada commit.
+9. **Seguridad por Defecto y Mínimo Privilegio (OE-6):**
+   * Todo endpoint de negocio debe declarar sus permisos con `Depends(require_permissions(...))`.
+   * La identidad (inspector, actor, autor de evidencia) se deriva **exclusivamente** de `get_current_user`; está prohibido recibirla en el payload del cliente.
+   * El filtrado multi-hospital se aplica siempre en la consulta SQL con `apply_hospital_scope()`.
+   * Las inspecciones abiertas ajenas deben retornar HTTP 404 (cloaking) ante consultas de técnicos para evitar la enumeración de recursos no autorizados.

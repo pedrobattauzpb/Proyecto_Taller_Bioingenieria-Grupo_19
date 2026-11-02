@@ -9,10 +9,12 @@ import {
   FileBarChart2,
   Bell,
   BellRing,
+  Users,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useTheme } from '../../context/ThemeContext';
 import { useAlerts } from '../../context/AlertsContext';
+import { usePermission } from '../../hooks/usePermission';
 
 interface SidebarProps {
   className?: string;
@@ -22,25 +24,31 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
   const { theme, toggleTheme } = useTheme();
   const { summary, unreadCount } = useAlerts();
+  const { can, hasRole } = usePermission();
 
   const alertBadgeCount = unreadCount > 0 ? unreadCount : summary?.open_total || 0;
   const isCritical = (summary?.unacknowledged_critical ?? 0) > 0;
+
+  const isSupervisorOnly = hasRole('SUPERVISOR') && !can('users:manage');
 
   const navItems = [
     {
       label: 'Panel Principal',
       path: '/dashboard',
       icon: LayoutDashboard,
+      visible: true,
     },
     {
       label: 'Inspecciones',
       path: '/inspections',
       icon: ClipboardList,
+      visible: true,
     },
     {
       label: 'Reportes y Auditoría',
       path: '/reports',
       icon: FileBarChart2,
+      visible: true,
     },
     {
       label: 'Centro de Alertas',
@@ -48,11 +56,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
       icon: Bell,
       badge: alertBadgeCount,
       badgeCritical: isCritical,
+      visible: can('alerts:read'),
     },
     {
       label: 'Notificaciones',
       path: '/settings/notifications',
       icon: BellRing,
+      visible: can('notifications:manage'),
+    },
+    {
+      label: isSupervisorOnly ? 'Técnicos del Hospital' : 'Usuarios y Accesos',
+      path: '/admin/users',
+      icon: Users,
+      visible: can('users:read'),
     },
   ];
 
@@ -68,44 +84,51 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onItemClick }) => {
         <span className="text-[10.5px] font-bold text-[var(--ink-faint)] uppercase tracking-wider px-3 mb-2">
           NAVEGACIÓN
         </span>
-        {navItems.map((item) => {
-          const Icon = item.icon;
+        {navItems
+          .filter((item) => item.visible)
+          .map((item) => {
+            const Icon = item.icon;
 
-          return (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              onClick={onItemClick}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center justify-between py-2 px-3 rounded-lg text-sm transition-all cursor-pointer no-underline',
-                  isActive
-                    ? 'bg-[var(--accent-soft)] text-[var(--accent-strong)] font-semibold'
-                    : 'text-[var(--ink-soft)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)] font-medium'
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <div className="flex items-center gap-2.5">
-                    <Icon className={cn('w-4 h-4 shrink-0', isActive ? 'text-[var(--accent-strong)]' : 'text-[var(--ink-faint)]')} />
-                    <span>{item.label}</span>
-                  </div>
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                onClick={onItemClick}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center justify-between py-2 px-3 rounded-lg text-sm transition-all cursor-pointer no-underline',
+                    isActive
+                      ? 'bg-[var(--accent-soft)] text-[var(--accent-strong)] font-semibold'
+                      : 'text-[var(--ink-soft)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)] font-medium'
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <div className="flex items-center gap-2.5">
+                      <Icon
+                        className={cn(
+                          'w-4 h-4 shrink-0',
+                          isActive ? 'text-[var(--accent-strong)]' : 'text-[var(--ink-faint)]'
+                        )}
+                      />
+                      <span>{item.label}</span>
+                    </div>
 
-                  {item.badge && item.badge > 0 ? (
-                    <span
-                      className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded-full text-white ${
-                        item.badgeCritical ? 'bg-[var(--danger)] animate-pulse' : 'bg-[var(--warn)]'
-                      }`}
-                    >
-                      {item.badge}
-                    </span>
-                  ) : null}
-                </>
-              )}
-            </NavLink>
-          );
-        })}
+                    {item.badge && item.badge > 0 ? (
+                      <span
+                        className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded-full text-white ${
+                          item.badgeCritical ? 'bg-[var(--danger)] animate-pulse' : 'bg-[var(--warn)]'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    ) : null}
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
       </div>
 
       {/* Sección Inferior: Botón de Tema y Nota Normativa */}

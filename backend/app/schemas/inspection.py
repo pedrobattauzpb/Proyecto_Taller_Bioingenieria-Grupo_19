@@ -5,6 +5,7 @@ from app.models.inspection import InspectionStatus
 from app.schemas.hierarchy import AssetRead
 from app.schemas.checklist import ChecklistTemplateRead, ChecklistItemRead
 from app.schemas.compliance import ComplianceSummary
+from app.schemas.evidence import InspectionEvidenceRead
 
 
 class InspectionResponseBase(BaseModel):
@@ -35,7 +36,7 @@ class BatchInspectionResponsesRequest(BaseModel):
 class InspectionBase(BaseModel):
     asset_id: int
     template_id: Optional[int] = None
-    inspector_name: str
+    inspector_name: Optional[str] = None  # Deprecado en OE-6; se completa desde el usuario autenticado
     notes: Optional[str] = None
 
 
@@ -48,13 +49,12 @@ class InspectionRead(InspectionBase):
     status: InspectionStatus
     started_at: datetime
     completed_at: Optional[datetime] = None
+    inspector_id: Optional[int] = None
+    completed_by_id: Optional[int] = None
     asset: Optional[AssetRead] = None
     template: Optional[ChecklistTemplateRead] = None
 
     model_config = ConfigDict(from_attributes=True)
-
-
-from app.schemas.evidence import InspectionEvidenceRead
 
 
 class InspectionDetailRead(InspectionRead):
@@ -70,7 +70,7 @@ class InspectionDetailRead(InspectionRead):
 
 class InspectionCompleteRequest(BaseModel):
     notes: Optional[str] = None
-    inspector_name: Optional[str] = None
+    inspector_name: Optional[str] = None  # Deprecado; se toma del usuario autenticado
 
 
 class InspectionHistoryItem(BaseModel):
@@ -81,6 +81,8 @@ class InspectionHistoryItem(BaseModel):
     asset_type: str
     template_title: str
     inspector_name: str
+    inspector_id: Optional[int] = None
+    completed_by_id: Optional[int] = None
     status: InspectionStatus
     started_at: datetime
     completed_at: Optional[datetime] = None
@@ -103,4 +105,3 @@ class StatsOverviewResponse(BaseModel):
     recent_inspections: List[InspectionHistoryItem] = []
     global_compliance_percentage: Optional[float] = 100.0
     active_outdated_norms_count: Optional[int] = 0
-

@@ -4,12 +4,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.core.database import get_db
+from app.core.permissions import Permission
 from app.models.hierarchy import AssetType
 from app.models.checklist import ChecklistTemplate, ChecklistItem
+from app.models.user import User
 from app.schemas.checklist import (
     ChecklistTemplateCreate, ChecklistTemplateRead,
     ChecklistItemCreate, ChecklistItemRead
 )
+from app.api.deps import require_permissions
 
 router = APIRouter()
 
@@ -17,6 +20,7 @@ router = APIRouter()
 @router.get("/template", response_model=ChecklistTemplateRead, summary="Obtener plantilla activa por tipo de activo")
 async def get_active_template_by_asset_type(
     asset_type: AssetType = Query(..., description="Tipo de activo (MANIFOLD, AVSU_VALVE, TERMINAL_UNIT, PRESSURE_REGULATOR, GAS_CYLINDER)"),
+    user: User = Depends(require_permissions(Permission.TEMPLATES_READ)),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -46,7 +50,10 @@ async def get_active_template_by_asset_type(
 
 
 @router.get("/templates", response_model=List[ChecklistTemplateRead], summary="Listar todas las plantillas")
-async def list_templates(db: AsyncSession = Depends(get_db)):
+async def list_templates(
+    user: User = Depends(require_permissions(Permission.TEMPLATES_READ)),
+    db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(
         select(ChecklistTemplate)
         .options(selectinload(ChecklistTemplate.items))
@@ -59,7 +66,11 @@ async def list_templates(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/templates", response_model=ChecklistTemplateRead, status_code=status.HTTP_201_CREATED)
-async def create_template(template_in: ChecklistTemplateCreate, db: AsyncSession = Depends(get_db)):
+async def create_template(
+    template_in: ChecklistTemplateCreate,
+    user: User = Depends(require_permissions(Permission.TEMPLATES_WRITE)),
+    db: AsyncSession = Depends(get_db)
+):
     template = ChecklistTemplate(
         title=template_in.title,
         asset_type=template_in.asset_type,
